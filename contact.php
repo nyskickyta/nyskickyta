@@ -1,9 +1,14 @@
 <?php
 declare(strict_types=1);
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: index.html');
+function redirect(string $location): never
+{
+    header('Location: ' . $location, true, 303);
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect('index.html');
 }
 
 $name = trim((string)($_POST['name'] ?? ''));
@@ -14,26 +19,23 @@ $website = trim((string)($_POST['website'] ?? ''));
 $formStarted = (int)($_POST['form_started'] ?? 0);
 
 if ($website !== '') {
-    header('Location: tack.html');
-    exit;
+    redirect('index.html?status=review#offert-form');
 }
 
 $nowMs = (int)round(microtime(true) * 1000);
-$elapsedMs = $formStarted > 0 ? $nowMs - $formStarted : 0;
+$elapsedMs = $formStarted > 0 ? $nowMs - $formStarted : null;
 
-if ($formStarted <= 0 || $elapsedMs < 2500) {
-    header('Location: tack.html');
-    exit;
+// Treat only unnaturally fast JS-enabled submissions as spam.
+if ($elapsedMs !== null && $elapsedMs < 2500) {
+    redirect('index.html?status=review#offert-form');
 }
 
 if ($name === '' || $phone === '' || $email === '') {
-    header('Location: index.html#offert-form');
-    exit;
+    redirect('index.html?status=validation#offert-form');
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    header('Location: index.html#offert-form');
-    exit;
+    redirect('index.html?status=validation#offert-form');
 }
 
 $combinedText = mb_strtolower($name . ' ' . $message . ' ' . $email, 'UTF-8');
@@ -42,14 +44,12 @@ $spamHints = ['viagra', 'casino', 'crypto', 'loan', 'seo service', 'backlink', '
 
 foreach ($spamHints as $hint) {
     if (str_contains($combinedText, $hint)) {
-        header('Location: tack.html');
-        exit;
+        redirect('index.html?status=review#offert-form');
     }
 }
 
 if ($urlCount > 1) {
-    header('Location: tack.html');
-    exit;
+    redirect('index.html?status=review#offert-form');
 }
 
 $to = 'info@nyskickstenaltan.se';
@@ -65,19 +65,18 @@ $bodyLines = [
 ];
 
 $body = implode("\n", $bodyLines);
+$safeReplyTo = str_replace(["\r", "\n"], '', $email);
 
 $headers = [
     'From: info@nyskickstenaltan.se',
-    'Reply-To: ' . $email,
+    'Reply-To: ' . $safeReplyTo,
     'Content-Type: text/plain; charset=UTF-8',
 ];
 
 $sent = mail($to, $subject, $body, implode("\r\n", $headers));
 
 if ($sent) {
-    header('Location: tack.html');
-    exit;
+    redirect('tack.html');
 }
 
-header('Location: index.html#offert-form');
-exit;
+redirect('index.html?status=error#offert-form');
