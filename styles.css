@@ -42,6 +42,10 @@ p {
   line-height: 1.65;
 }
 
+p + p {
+  margin-top: 14px;
+}
+
 .container {
   width: min(calc(100% - 32px), var(--container));
   margin: 0 auto;
@@ -184,6 +188,10 @@ h1 {
 
 .hero-copy h1 {
   margin-bottom: 16px;
+}
+
+.hero-copy p + p {
+  margin-top: 14px;
 }
 
 h2 {
@@ -460,6 +468,14 @@ h3 {
   margin-bottom: 24px;
 }
 
+.section-heading h2 + p {
+  margin-top: 14px;
+}
+
+.section-heading p + p {
+  margin-top: 14px;
+}
+
 .section-heading-center {
   text-align: center;
 }
@@ -477,6 +493,175 @@ h3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+
+.packages-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+  margin-top: 18px;
+}
+
+.packages-grid-stone {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.packages-grid-deck {
+  gap: 16px;
+}
+
+.packages-grid-deck .package-card {
+  gap: 7px;
+  padding: 22px 18px;
+}
+
+.packages-grid-deck .package-badge {
+  top: 14px;
+  right: 14px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+.packages-grid-deck .package-kicker {
+  font-size: 0.76rem;
+}
+
+.packages-grid-deck .package-card h3 {
+  font-size: 1.08rem;
+}
+
+.packages-grid-deck .package-card p,
+.packages-grid-deck .package-card li {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.packages-grid-deck .package-list {
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.packages-grid-stone .package-card {
+  gap: 7px;
+  padding: 22px 18px;
+}
+
+.packages-grid-stone .package-badge {
+  top: 14px;
+  right: 14px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+.packages-grid-stone .package-kicker {
+  font-size: 0.76rem;
+}
+
+.packages-grid-stone .package-card h3 {
+  font-size: 1.06rem;
+  min-height: 0;
+}
+
+.packages-grid-stone .package-card p,
+.packages-grid-stone .package-card li {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.packages-grid-stone .package-list {
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.package-actions {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.package-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 28px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.package-card p,
+.package-card li {
+  line-height: 1.6;
+}
+
+.package-card p + p {
+  margin-top: 0;
+}
+
+.package-intro {
+  min-height: 0;
+}
+
+.package-card-featured {
+  border: 2px solid #84cc16;
+  background: #f7fee7;
+  box-shadow: 0 14px 34px rgba(110, 161, 15, 0.14);
+}
+
+.package-badge {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(110, 161, 15, 0.12);
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.package-kicker {
+  color: var(--green-dark);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.82rem;
+}
+
+.package-head {
+  display: block;
+}
+
+.package-card h3 {
+  min-height: 2.8em;
+}
+
+.package-label {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.98rem;
+  margin-top: 0;
+}
+
+.package-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.package-list li::marker {
+  color: var(--green);
 }
 
 .before-after-grid {
@@ -552,6 +737,16 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.why-card {
+  grid-column: span 2;
+}
+
 .process-trust-points {
   display: flex;
   flex-wrap: wrap;
@@ -597,6 +792,17 @@ h3 {
 
 .text-block {
   max-width: 860px;
+}
+
+.text-block p + p,
+.service-card p + p,
+.before-after-card p + p,
+.process-card p + p,
+.quote-box p + p,
+.review-card p + p,
+.cta-box p + p,
+.footer-inner p + p {
+  margin-top: 12px;
 }
 
 .cta-section {
@@ -654,11 +860,17 @@ h3 {
   .hero-grid,
   .trust-items,
   .services-grid,
+  .packages-grid,
   .before-after-grid,
   .process-grid,
+  .why-grid,
   .reviews-grid,
   .cta-box {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .why-card {
+    grid-column: auto;
   }
 
   .cta-box {
@@ -695,8 +907,10 @@ h3 {
   .hero-grid,
   .trust-items,
   .services-grid,
+  .packages-grid,
   .before-after-grid,
   .process-grid,
+  .why-grid,
   .reviews-grid,
   .cta-box {
     grid-template-columns: 1fr;
@@ -725,5 +939,17 @@ h3 {
 
   body {
     padding-bottom: 86px;
+  }
+
+  .package-intro {
+    min-height: 0;
+  }
+
+  .package-card h3 {
+    min-height: 0;
+  }
+
+  .package-head {
+    min-height: 0;
   }
 }
