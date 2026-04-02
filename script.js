@@ -22,11 +22,38 @@ const startedField = offerForm?.querySelector('input[name="form_started"]');
 const formStatus = document.querySelector("[data-form-status]");
 const navToggle = document.querySelector(".nav-toggle");
 const siteNav = document.querySelector(".site-nav");
+const siteHeader = document.querySelector(".site-header");
+const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
 const statusMessages = {
   validation: "Fyll i namn, telefon och en giltig e-postadress innan du skickar formuläret.",
   review: "Din förfrågan kunde inte skickas direkt. Kontrollera uppgifterna och försök igen, eller ring oss så hjälper vi dig direkt.",
   error: "Något gick fel när formuläret skulle skickas. Försök igen om en liten stund eller ring oss direkt.",
 };
+
+function closeMobileNav() {
+  if (!navToggle || !siteNav) {
+    return;
+  }
+
+  navToggle.setAttribute("aria-expanded", "false");
+  navToggle.setAttribute("aria-label", "Öppna meny");
+  siteNav.classList.remove("is-open");
+}
+
+function scrollToOfferForm() {
+  const target = document.querySelector("#offert-form");
+  if (!target) {
+    return;
+  }
+
+  const headerOffset = siteHeader ? siteHeader.getBoundingClientRect().height + 16 : 96;
+  const targetTop = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+
+  window.scrollTo({
+    top: Math.max(targetTop, 0),
+    behavior: "smooth",
+  });
+}
 
 if (startedField) {
   startedField.value = String(Date.now());
@@ -54,9 +81,19 @@ if (navToggle && siteNav) {
 
   siteNav.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => {
-      navToggle.setAttribute("aria-expanded", "false");
-      navToggle.setAttribute("aria-label", "Öppna meny");
-      siteNav.classList.remove("is-open");
+      closeMobileNav();
     });
   });
 }
+
+quoteAnchorLinks.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeMobileNav();
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        scrollToOfferForm();
+      });
+    });
+  });
+});
