@@ -921,6 +921,16 @@ h3 {
     width: 100%;
   }
 
+  .hero-card {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .quote-box {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
   .footer-inner {
     flex-direction: column;
   }
@@ -934,7 +944,7 @@ h3 {
   }
 
   #offert-form {
-    scroll-margin-top: 140px;
+    scroll-margin-top: 120px;
   }
 
   .package-intro {
