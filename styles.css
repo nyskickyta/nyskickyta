@@ -933,12 +933,8 @@ h3 {
     justify-content: flex-start;
   }
 
-  .mobile-sticky-call {
-    display: inline-flex;
-  }
-
-  body {
-    padding-bottom: 86px;
+  #offert-form {
+    scroll-margin-top: 140px;
   }
 
   .package-intro {
