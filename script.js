@@ -46,11 +46,13 @@ function scrollToOfferForm() {
     return;
   }
 
-  const headerOffset = siteHeader ? siteHeader.getBoundingClientRect().height + 16 : 96;
+  const isMobileViewport = window.matchMedia("(max-width: 760px)").matches;
+  const headerOffset = siteHeader ? siteHeader.getBoundingClientRect().height : 96;
+  const extraOffset = isMobileViewport ? 56 : 20;
   const targetTop = target.getBoundingClientRect().top + window.scrollY - headerOffset;
 
   window.scrollTo({
-    top: Math.max(targetTop, 0),
+    top: Math.max(targetTop - extraOffset, 0),
     behavior: "smooth",
   });
 }
@@ -90,10 +92,6 @@ quoteAnchorLinks.forEach((link) => {
   link.addEventListener("click", (event) => {
     event.preventDefault();
     closeMobileNav();
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        scrollToOfferForm();
-      });
-    });
+    window.setTimeout(scrollToOfferForm, 180);
   });
 });
