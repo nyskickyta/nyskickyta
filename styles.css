@@ -921,6 +921,10 @@ h3 {
     width: 100%;
   }
 
+  .header-call {
+    display: none;
+  }
+
   .hero-card {
     width: 100%;
     justify-self: stretch;
@@ -944,7 +948,7 @@ h3 {
   }
 
   #offert-form {
-    scroll-margin-top: 120px;
+    scroll-margin-top: 88px;
   }
 
   .package-intro {
