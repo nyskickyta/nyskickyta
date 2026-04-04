@@ -670,6 +670,31 @@ h3 {
   gap: 18px;
 }
 
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.info-note {
+  padding: 22px 24px;
+  background: linear-gradient(180deg, #f9fcf4 0%, #f4f8ee 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.info-note strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--green-dark);
+  font-size: 1rem;
+}
+
+.info-note p + p {
+  margin-top: 10px;
+}
+
 .before-after-card {
   padding: 18px;
 }
@@ -862,6 +887,7 @@ h3 {
   .services-grid,
   .packages-grid,
   .before-after-grid,
+  .option-grid,
   .process-grid,
   .why-grid,
   .reviews-grid,
@@ -909,6 +935,7 @@ h3 {
   .services-grid,
   .packages-grid,
   .before-after-grid,
+  .option-grid,
   .process-grid,
   .why-grid,
   .reviews-grid,
