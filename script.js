@@ -25,7 +25,7 @@ const siteNav = document.querySelector(".site-nav");
 const siteHeader = document.querySelector(".site-header");
 const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
 const statusMessages = {
-  validation: "Fyll i namn, telefon och en giltig e-postadress innan du skickar formuläret.",
+  validation: "Fyll i namn, telefon, e-post och adressuppgifterna innan du skickar formuläret.",
   review: "Din förfrågan kunde inte skickas direkt. Kontrollera uppgifterna och försök igen, eller ring oss så hjälper vi dig direkt.",
   error: "Något gick fel när formuläret skulle skickas. Försök igen om en liten stund eller ring oss direkt.",
 };

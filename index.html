@@ -102,6 +102,7 @@
                 method="POST"
               >
                 <input type="hidden" name="form_started" value="" />
+                <input type="hidden" name="sourcePage" value="homepage" />
                 <label class="hp-field" aria-hidden="true">
                   Lämna detta fält tomt
                   <input type="text" name="website" tabindex="-1" autocomplete="off" />
@@ -117,6 +118,18 @@
                 <label>
                   E-post
                   <input type="email" name="email" placeholder="din@email.se" required />
+                </label>
+                <label>
+                  Adress
+                  <input type="text" name="serviceAddress" placeholder="Gatuadress" required />
+                </label>
+                <label>
+                  Postnummer
+                  <input type="text" name="servicePostalCode" placeholder="791 34" required />
+                </label>
+                <label>
+                  Ort
+                  <input type="text" name="serviceCity" placeholder="Falun" required />
                 </label>
                 <label>
                   Vad vill du ha hjälp med?
