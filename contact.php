@@ -16,6 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $name = trim((string)($_POST['name'] ?? ''));
 $phone = trim((string)($_POST['phone'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
+$requestType = trim((string)($_POST['requestType'] ?? ''));
+$surfaceSize = trim((string)($_POST['surfaceSize'] ?? ''));
+$growthLevel = trim((string)($_POST['growthLevel'] ?? ''));
+$hasDetails = trim((string)($_POST['hasDetails'] ?? ''));
 $serviceAddress = trim((string)($_POST['serviceAddress'] ?? ''));
 $servicePostalCode = trim((string)($_POST['servicePostalCode'] ?? ''));
 $serviceCity = trim((string)($_POST['serviceCity'] ?? ''));
@@ -36,15 +40,38 @@ if ($elapsedMs !== null && $elapsedMs < 2500) {
     contact_redirect('index.html?status=review#offert-form');
 }
 
-if ($name === '' || $phone === '' || $email === '' || $serviceAddress === '' || $servicePostalCode === '' || $serviceCity === '') {
+if (
+    $name === ''
+    || $phone === ''
+    || $requestType === ''
+    || $surfaceSize === ''
+    || $growthLevel === ''
+    || $hasDetails === ''
+    || $serviceAddress === ''
+    || $servicePostalCode === ''
+    || $serviceCity === ''
+) {
     contact_redirect('index.html?status=validation#offert-form');
 }
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     contact_redirect('index.html?status=validation#offert-form');
 }
 
-$combinedText = mb_strtolower($name . ' ' . $message . ' ' . $email, 'UTF-8');
+$structuredMessageParts = [
+    'Gäller: ' . $requestType,
+    'Storlek: ' . $surfaceSize,
+    'Påväxt: ' . $growthLevel,
+    'Detaljer: ' . $hasDetails,
+];
+
+if ($message !== '') {
+    $structuredMessageParts[] = 'Meddelande: ' . $message;
+}
+
+$structuredMessage = implode("\n", $structuredMessageParts);
+
+$combinedText = mb_strtolower($name . ' ' . $structuredMessage . ' ' . $email, 'UTF-8');
 $urlCount = preg_match_all('/https?:\/\//i', $combinedText);
 $spamHints = ['viagra', 'casino', 'crypto', 'loan', 'seo service', 'backlink', 'telegram', 'whatsapp'];
 
@@ -66,7 +93,11 @@ $bodyLines = [
     "",
     "Namn: " . $name,
     "Telefon: " . $phone,
-    "E-post: " . $email,
+    "E-post: " . ($email !== '' ? $email : 'Ej angivet'),
+    "Gäller: " . $requestType,
+    "Storlek: " . $surfaceSize,
+    "Påväxt: " . $growthLevel,
+    "Detaljer: " . $hasDetails,
     "Adress: " . $serviceAddress,
     "Postnummer: " . $servicePostalCode,
     "Ort: " . $serviceCity,
@@ -78,9 +109,11 @@ $safeReplyTo = str_replace(["\r", "\n"], '', $email);
 
 $headers = [
     'From: info@nyskickstenaltan.se',
-    'Reply-To: ' . $safeReplyTo,
     'Content-Type: text/plain; charset=UTF-8',
 ];
+if ($safeReplyTo !== '') {
+    $headers[] = 'Reply-To: ' . $safeReplyTo;
+}
 
 $savedInSystem = false;
 if (mysql_is_configured()) {
@@ -94,7 +127,7 @@ if (mysql_is_configured()) {
                 'serviceAddress' => $serviceAddress,
                 'servicePostalCode' => $servicePostalCode,
                 'serviceCity' => $serviceCity,
-                'message' => $message,
+                'message' => $structuredMessage,
                 'sourcePage' => $sourcePage,
             ]);
             $savedInSystem = true;

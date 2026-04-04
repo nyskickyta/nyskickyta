@@ -87,8 +87,8 @@
 
           <div class="hero-card" id="offert-form">
             <div class="quote-box">
-              <p class="quote-title">Få en kostnadsfri offert</p>
-              <p class="form-note">Tar mindre än 1 minut – vi återkommer snabbt</p>
+              <p class="quote-title">Få ett prisförslag på din altan eller sten</p>
+              <p class="form-note">Tar mindre än 30 sekunder – vi återkommer med ett förslag utan förpliktelser</p>
               <div
                 class="form-status"
                 data-form-status
@@ -116,8 +116,44 @@
                   <input type="tel" name="phone" placeholder="0241-809060" required />
                 </label>
                 <label>
-                  E-post
-                  <input type="email" name="email" placeholder="din@email.se" required />
+                  E-post (valfri)
+                  <input type="email" name="email" placeholder="din@email.se" />
+                </label>
+                <label>
+                  Vad gäller det?
+                  <select name="requestType" required>
+                    <option value="">Välj</option>
+                    <option value="Altan">Altan</option>
+                    <option value="Sten">Sten</option>
+                    <option value="Både">Både</option>
+                  </select>
+                </label>
+                <label>
+                  Storlek
+                  <select name="surfaceSize" required>
+                    <option value="">Välj</option>
+                    <option value="0–20 m²">0–20 m²</option>
+                    <option value="20–40 m²">20–40 m²</option>
+                    <option value="40–60 m²">40–60 m²</option>
+                    <option value="60+ m²">60+ m²</option>
+                  </select>
+                </label>
+                <label>
+                  Påväxt
+                  <select name="growthLevel" required>
+                    <option value="">Välj</option>
+                    <option value="Lite">lite</option>
+                    <option value="Normalt">normalt</option>
+                    <option value="Mycket">mycket</option>
+                  </select>
+                </label>
+                <label>
+                  Detaljer
+                  <select name="hasDetails" required>
+                    <option value="">Välj</option>
+                    <option value="Ja">ja</option>
+                    <option value="Nej">nej</option>
+                  </select>
                 </label>
                 <label>
                   Adress
@@ -131,15 +167,8 @@
                   Ort
                   <input type="text" name="serviceCity" placeholder="Falun" required />
                 </label>
-                <label>
-                  Vad vill du ha hjälp med?
-                  <textarea
-                    name="message"
-                    rows="4"
-                    placeholder="Till exempel sten- eller altantvätt med impregnering."
-                  ></textarea>
-                </label>
-                <button class="button button-primary" type="submit">Skicka förfrågan</button>
+                <p class="form-note">Vi använder dina uppgifter endast för att återkomma med offert.</p>
+                <button class="button button-primary" type="submit">Få prisförslag</button>
               </form>
             </div>
           </div>
