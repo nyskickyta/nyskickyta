@@ -35,6 +35,7 @@
     <link rel="icon" href="/favicon-v2.ico" type="image/x-icon" />
     <link rel="shortcut icon" href="/favicon-v2.ico" type="image/x-icon" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="site-config.php"></script>
   </head>
   <body>
     <header class="site-header">
@@ -109,15 +110,15 @@
                 </label>
                 <label>
                   Namn
-                  <input type="text" name="name" placeholder="Ditt namn" required />
+                  <input type="text" name="name" placeholder="Ditt namn" autocomplete="name" required />
                 </label>
                 <label>
                   Telefon
-                  <input type="tel" name="phone" placeholder="0241-809060" required />
+                  <input type="tel" name="phone" placeholder="0241-809060" autocomplete="tel" required />
                 </label>
                 <label>
                   E-post (valfri)
-                  <input type="email" name="email" placeholder="din@email.se" />
+                  <input type="email" name="email" placeholder="din@email.se" autocomplete="email" />
                 </label>
                 <label>
                   Vad gäller det?
@@ -155,19 +156,49 @@
                     <option value="Nej">nej</option>
                   </select>
                 </label>
-                <label>
-                  Adress
-                  <input type="text" name="serviceAddress" placeholder="Gatuadress" required />
-                </label>
-                <label>
-                  Postnummer
-                  <input type="text" name="servicePostalCode" placeholder="791 34" required />
-                </label>
-                <label>
-                  Ort
-                  <input type="text" name="serviceCity" placeholder="Falun" required />
-                </label>
-                <p class="form-note">Vi använder dina uppgifter endast för att återkomma med offert.</p>
+                <div class="address-fields">
+                  <label class="address-field-street">
+                    Adress
+                    <div class="address-autocomplete-shell" data-address-autocomplete-shell>
+                      <input
+                        type="text"
+                        name="serviceAddress"
+                        placeholder="Börja med gatuadress"
+                        autocomplete="street-address"
+                        data-address-street
+                        required
+                      />
+                    </div>
+                  </label>
+                  <div class="address-row">
+                    <label>
+                      Postnummer
+                      <input
+                        type="text"
+                        name="servicePostalCode"
+                        placeholder="791 34"
+                        autocomplete="postal-code"
+                        inputmode="numeric"
+                        maxlength="6"
+                        data-address-postcode
+                        required
+                      />
+                    </label>
+                    <label>
+                      Ort
+                      <input
+                        type="text"
+                        name="serviceCity"
+                        placeholder="Falun"
+                        autocomplete="address-level2"
+                        data-address-city
+                        required
+                      />
+                    </label>
+                  </div>
+                  <p class="form-help">Börja med gatuadressen. Webbläsaren kan ofta hjälpa till att fylla postnummer och ort automatiskt.</p>
+                </div>
+                <p class="form-note">Vi använder dina uppgifter endast för att återkomma med offert. Läs mer i vår <a href="integritetspolicy.html">integritetspolicy</a>.</p>
                 <button class="button button-primary" type="submit">Få prisförslag</button>
               </form>
             </div>

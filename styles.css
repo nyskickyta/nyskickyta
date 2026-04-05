@@ -327,6 +327,31 @@ h3 {
   font-weight: 600;
 }
 
+.address-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.address-autocomplete-shell {
+  display: grid;
+}
+
+.address-autocomplete-shell gmp-place-autocomplete {
+  width: 100%;
+}
+
+.address-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 12px;
+}
+
+.form-help {
+  margin: -2px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .hp-field {
   position: absolute;
   left: -9999px;
@@ -610,6 +635,7 @@ h3 {
   border: 2px solid #84cc16;
   background: #f7fee7;
   box-shadow: 0 14px 34px rgba(110, 161, 15, 0.14);
+  transform: translateY(-4px);
 }
 
 .package-badge {
@@ -650,6 +676,32 @@ h3 {
   font-weight: 700;
   font-size: 0.98rem;
   margin-top: 0;
+}
+
+.package-price {
+  font-family: "Montserrat", sans-serif;
+  font-size: 1.18rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.package-price-featured {
+  font-size: 1.34rem;
+  color: var(--green-dark);
+}
+
+.package-price-note {
+  color: var(--green-dark);
+  font-weight: 700;
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.package-highlight-text {
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 .package-list {
@@ -960,6 +1012,10 @@ h3 {
   .quote-box {
     padding-top: 20px;
     padding-bottom: 20px;
+  }
+
+  .address-row {
+    grid-template-columns: 1fr;
   }
 
   .footer-inner {
