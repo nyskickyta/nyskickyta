@@ -35,13 +35,43 @@
     <link rel="icon" href="/favicon-v2.ico" type="image/x-icon" />
     <link rel="shortcut icon" href="/favicon-v2.ico" type="image/x-icon" />
     <link rel="stylesheet" href="styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "LocalBusiness",
+            "@id": "https://www.nyskickstenaltan.se/#business",
+            "name": "Nyskick Sten & Altan",
+            "url": "https://www.nyskickstenaltan.se/",
+            "image": "https://www.nyskickstenaltan.se/nyskick-logo.jpeg",
+            "logo": "https://www.nyskickstenaltan.se/nyskick-logo.jpeg",
+            "telephone": "+46241809060",
+            "email": "info@nyskickstenaltan.se",
+            "areaServed": [
+              { "@type": "AdministrativeArea", "name": "Dalarna" },
+              { "@type": "Country", "name": "Sverige" }
+            ],
+            "knowsAbout": ["Stentvätt", "Altantvätt", "Impregnering", "Behandling av trädäck"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.nyskickstenaltan.se/#website",
+            "url": "https://www.nyskickstenaltan.se/",
+            "name": "Nyskick Sten & Altan",
+            "publisher": { "@id": "https://www.nyskickstenaltan.se/#business" },
+            "inLanguage": "sv-SE"
+          }
+        ]
+      }
+    </script>
     <script src="site-config.php"></script>
   </head>
   <body>
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="#top" aria-label="Nyskick Sten & Altan startsida">
-          <img class="brand-logo" src="nyskick-logo.jpeg" alt="Nyskick Sten & Altan" />
+          <img class="brand-logo" src="nyskick-logo.jpeg" alt="Nyskick Sten & Altan" width="640" height="512" decoding="async" />
           <div class="brand-copy">
             <strong>Nyskick Sten & Altan</strong>
             <span>Sten & Altantvätt med impregnering</span>
@@ -344,11 +374,11 @@
           <div class="before-after-grid">
             <article class="before-after-card">
               <div class="comparison comparison-before">
-                <img src="stentvatt-borlange-fore.jpg" alt="Stentvätt i Borlänge före rengöring" />
+                <img src="stentvatt-borlange-fore.jpg" alt="Stentvätt i Borlänge före rengöring" width="761" height="1024" loading="lazy" decoding="async" />
                 <span>Före</span>
               </div>
               <div class="comparison comparison-after">
-                <img src="stentvatt-borlange-efter.jpg" alt="Stentvätt i Borlänge efter rengöring" />
+                <img src="stentvatt-borlange-efter.jpg" alt="Stentvätt i Borlänge efter rengöring" width="761" height="1022" loading="lazy" decoding="async" />
                 <span>Efter</span>
               </div>
               <h3>Stentvätt i Borlänge</h3>
@@ -356,11 +386,11 @@
             </article>
             <article class="before-after-card">
               <div class="comparison comparison-before wood-before">
-                <img src="altantvatt-falun-fore.jpg" alt="Altantvätt i Falun före rengöring" />
+                <img src="altantvatt-falun-fore.jpg" alt="Altantvätt i Falun före rengöring" width="753" height="1022" loading="lazy" decoding="async" />
                 <span>Före</span>
               </div>
               <div class="comparison comparison-after wood-after">
-                <img src="altantvatt-falun-efter.jpg" alt="Altantvätt i Falun efter rengöring" />
+                <img src="altantvatt-falun-efter.jpg" alt="Altantvätt i Falun efter rengöring" width="753" height="1021" loading="lazy" decoding="async" />
                 <span>Efter</span>
               </div>
               <h3>Altantvätt i Falun</h3>

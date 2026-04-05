@@ -35,12 +35,47 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="../styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Service",
+            "@id": "https://www.nyskickstenaltan.se/altantvatt/#service",
+            "name": "Altantvätt och behandling av trädäck",
+            "serviceType": "Altantvätt",
+            "provider": {
+              "@type": "LocalBusiness",
+              "@id": "https://www.nyskickstenaltan.se/#business",
+              "name": "Nyskick Sten & Altan",
+              "url": "https://www.nyskickstenaltan.se/",
+              "telephone": "+46241809060"
+            },
+            "areaServed": [
+              { "@type": "AdministrativeArea", "name": "Dalarna" },
+              { "@type": "Country", "name": "Sverige" }
+            ],
+            "url": "https://www.nyskickstenaltan.se/altantvatt/",
+            "description": "Tvätt och behandling av trädäck med tydliga paket i Bas, Plus och Premium.",
+            "offers": { "@type": "Offer", "priceCurrency": "SEK" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://www.nyskickstenaltan.se/altantvatt/#breadcrumb",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Startsida", "item": "https://www.nyskickstenaltan.se/" },
+              { "@type": "ListItem", "position": 2, "name": "Altantvätt", "item": "https://www.nyskickstenaltan.se/altantvatt/" }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <header class="site-header">
       <div class="container header-inner">
         <a class="brand" href="../index.html" aria-label="Nyskick Sten & Altan startsida">
-          <img class="brand-logo" src="../nyskick-logo.jpeg" alt="Nyskick Sten & Altan" />
+          <img class="brand-logo" src="../nyskick-logo.jpeg" alt="Nyskick Sten & Altan" width="640" height="512" decoding="async" />
           <div class="brand-copy">
             <strong>Nyskick Sten & Altan</strong>
             <span>Sten- & Altantvätt med impregnering</span>
@@ -276,11 +311,11 @@
           <div class="before-after-grid">
             <article class="before-after-card">
               <div class="comparison comparison-before">
-                <img src="../altantvatt-falun-fore.jpg" alt="Altantvätt i Falun före rengöring" />
+                <img src="../altantvatt-falun-fore.jpg" alt="Altantvätt i Falun före rengöring" width="753" height="1022" loading="lazy" decoding="async" />
                 <span>Före</span>
               </div>
               <div class="comparison comparison-after">
-                <img src="../altantvatt-falun-efter.jpg" alt="Altantvätt i Falun efter rengöring" />
+                <img src="../altantvatt-falun-efter.jpg" alt="Altantvätt i Falun efter rengöring" width="753" height="1021" loading="lazy" decoding="async" />
                 <span>Efter</span>
               </div>
               <h3>Altantvätt i Falun</h3>
