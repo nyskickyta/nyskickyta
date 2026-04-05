@@ -30,11 +30,148 @@ const siteNav = document.querySelector(".site-nav");
 const siteHeader = document.querySelector(".site-header");
 const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
 const siteConfig = window.NYSKICK_SITE_CONFIG || {};
+const analyticsMeasurementId = "G-9TKSWWGZF7";
+const analyticsConsentKey = "nyskick_cookie_consent";
+const thankYouTrackedKey = "nyskick_generate_lead_tracked";
 const statusMessages = {
   validation: "Fyll i namn, telefon, valen i formuläret och adressuppgifterna innan du skickar formuläret.",
   review: "Din förfrågan kunde inte skickas direkt. Kontrollera uppgifterna och försök igen, eller ring oss så hjälper vi dig direkt.",
   error: "Något gick fel när formuläret skulle skickas. Försök igen om en liten stund eller ring oss direkt.",
 };
+
+function getAnalyticsConsent() {
+  try {
+    return window.localStorage.getItem(analyticsConsentKey);
+  } catch (error) {
+    return "";
+  }
+}
+
+function setAnalyticsConsent(value) {
+  try {
+    window.localStorage.setItem(analyticsConsentKey, value);
+  } catch (error) {
+    return;
+  }
+}
+
+function trackLeadIfNeeded() {
+  if (typeof window.gtag !== "function") {
+    return;
+  }
+
+  const isThankYouPage = /\/tack\.html$/.test(window.location.pathname);
+  if (!isThankYouPage) {
+    return;
+  }
+
+  try {
+    if (window.sessionStorage.getItem(thankYouTrackedKey) === "1") {
+      return;
+    }
+  } catch (error) {
+    // Ignore storage access issues and still attempt to track once per load.
+  }
+
+  window.gtag("event", "generate_lead", {
+    event_category: "form",
+    event_label: "quote_request",
+  });
+
+  try {
+    window.sessionStorage.setItem(thankYouTrackedKey, "1");
+  } catch (error) {
+    // Ignore storage access issues.
+  }
+}
+
+function loadAnalytics() {
+  if (!analyticsMeasurementId || document.querySelector('script[data-ga-loader="1"]')) {
+    trackLeadIfNeeded();
+    return;
+  }
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = window.gtag || function gtag() {
+    window.dataLayer.push(arguments);
+  };
+
+  window.gtag("js", new Date());
+  window.gtag("config", analyticsMeasurementId);
+
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(analyticsMeasurementId)}`;
+  script.dataset.gaLoader = "1";
+  script.addEventListener("load", () => {
+    trackLeadIfNeeded();
+  });
+  document.head.appendChild(script);
+}
+
+function removeCookieBanner() {
+  document.querySelector("[data-cookie-banner]")?.remove();
+}
+
+function createCookieBanner() {
+  if (document.querySelector("[data-cookie-banner]")) {
+    return;
+  }
+
+  const banner = document.createElement("div");
+  banner.className = "cookie-banner";
+  banner.dataset.cookieBanner = "1";
+  banner.innerHTML = `
+    <div class="cookie-banner__inner">
+      <div class="cookie-banner__copy">
+        <strong>Cookies för statistik</strong>
+        <p>Vi använder statistikcookies för att förstå hur webbplatsen används och förbättra formulär och innehåll. Läs mer i vår <a href="${window.location.pathname.startsWith("/altantvatt/") || window.location.pathname.startsWith("/stentvatt/") ? "../integritetspolicy.html" : "integritetspolicy.html"}">integritetspolicy</a>.</p>
+      </div>
+      <div class="cookie-banner__actions">
+        <button class="button button-secondary" type="button" data-cookie-decline>Endast nödvändiga</button>
+        <button class="button button-primary" type="button" data-cookie-accept>Godkänn statistik</button>
+      </div>
+    </div>
+  `;
+
+  banner.querySelector("[data-cookie-accept]")?.addEventListener("click", () => {
+    setAnalyticsConsent("accepted");
+    removeCookieBanner();
+    loadAnalytics();
+  });
+
+  banner.querySelector("[data-cookie-decline]")?.addEventListener("click", () => {
+    setAnalyticsConsent("declined");
+    removeCookieBanner();
+  });
+
+  document.body.appendChild(banner);
+}
+
+function initCookieConsent() {
+  const consent = getAnalyticsConsent();
+
+  if (consent === "accepted") {
+    loadAnalytics();
+    return;
+  }
+
+  if (consent === "declined") {
+    return;
+  }
+
+  createCookieBanner();
+}
+
+function showFormStatus(message, status = "validation") {
+  if (!formStatus) {
+    return;
+  }
+
+  formStatus.hidden = false;
+  formStatus.dataset.status = status;
+  formStatus.textContent = message;
+}
 
 function closeMobileNav() {
   if (!navToggle || !siteNav) {
@@ -305,6 +442,30 @@ if (formStatus) {
   }
 }
 
+if (offerForm) {
+  offerForm.addEventListener("submit", (event) => {
+    const autocompleteWidget = addressAutocompleteShell?.querySelector("gmp-place-autocomplete");
+    const usesWidget = Boolean(autocompleteWidget) && addressStreetField?.type === "hidden";
+    const missingAddressSelection =
+      usesWidget
+      && (
+        !String(addressStreetField?.value || "").trim()
+        || !String(addressPostalCodeField?.value || "").trim()
+        || !String(addressCityField?.value || "").trim()
+      );
+
+    if (!missingAddressSelection) {
+      return;
+    }
+
+    event.preventDefault();
+    showFormStatus(
+      "Välj ett adressförslag i listan så att postnummer och ort fylls i innan du skickar formuläret."
+    );
+    autocompleteWidget?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+}
+
 if (navToggle && siteNav) {
   navToggle.addEventListener("click", () => {
     const isOpen = navToggle.getAttribute("aria-expanded") === "true";
@@ -329,3 +490,4 @@ quoteAnchorLinks.forEach((link) => {
 });
 
 initAddressAutocomplete();
+initCookieConsent();
