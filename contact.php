@@ -62,7 +62,7 @@ $structuredMessageParts = [
     'Gäller: ' . $requestType,
     'Storlek: ' . $surfaceSize,
     'Påväxt: ' . $growthLevel,
-    'Detaljer: ' . $hasDetails,
+    'Trappor eller flera nivåer: ' . $hasDetails,
 ];
 
 if ($message !== '') {
@@ -97,7 +97,7 @@ $bodyLines = [
     "Gäller: " . $requestType,
     "Storlek: " . $surfaceSize,
     "Påväxt: " . $growthLevel,
-    "Detaljer: " . $hasDetails,
+    "Trappor eller flera nivåer: " . $hasDetails,
     "Adress: " . $serviceAddress,
     "Postnummer: " . $servicePostalCode,
     "Ort: " . $serviceCity,
