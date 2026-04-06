@@ -137,9 +137,13 @@
               ></div>
               <form
                 class="contact-form"
-                action="contact.php"
+                name="quote-request"
                 method="POST"
+                action="/tack.html"
+                data-netlify="true"
+                netlify-honeypot="website"
               >
+                <input type="hidden" name="form-name" value="quote-request" />
                 <input type="hidden" name="form_started" value="" />
                 <input type="hidden" name="sourcePage" value="homepage" />
                 <label class="hp-field" aria-hidden="true">
