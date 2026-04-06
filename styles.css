@@ -334,15 +334,17 @@ h3 {
 
 .address-autocomplete-shell {
   display: grid;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
 }
 
 .address-autocomplete-shell gmp-place-autocomplete {
   width: 100%;
   min-height: 52px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 10px;
-  background: #fff;
-  overflow: hidden;
+  background: transparent;
 }
 
 .address-row {
