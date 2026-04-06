@@ -58,6 +58,11 @@ function web_quote_mail_recipients(array $organization, array $data): array
             continue;
         }
 
+        $userRoles = normalize_role_list($user['effective_roles'] ?? ($user['role'] ?? USER_ROLE_WORKER));
+        if (!in_array(USER_ROLE_SALES, $userRoles, true)) {
+            continue;
+        }
+
         $userOrganizationId = (int)($user['organization_id'] ?? 0);
         $userRegionId = (int)($user['region_id'] ?? 0);
 
@@ -75,6 +80,11 @@ function web_quote_mail_recipients(array $organization, array $data): array
         foreach (($data['users'] ?? []) as $user) {
             if ((int)($user['id'] ?? 0) !== $userId || empty($user['is_active'])) {
                 continue;
+            }
+
+            $userRoles = normalize_role_list($user['effective_roles'] ?? ($user['role'] ?? USER_ROLE_WORKER));
+            if (!in_array(USER_ROLE_SALES, $userRoles, true)) {
+                break;
             }
 
             $email = normalized_email_value((string)($user['email'] ?? ''));
