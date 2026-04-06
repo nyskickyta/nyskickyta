@@ -173,6 +173,24 @@ function showFormStatus(message, status = "validation") {
   formStatus.textContent = message;
 }
 
+function getWidgetStreetValue(widget) {
+  if (!widget) {
+    return "";
+  }
+
+  const directValue = typeof widget.value === "string" ? widget.value.trim() : "";
+  if (directValue) {
+    return directValue;
+  }
+
+  const nestedInput = widget.querySelector("input");
+  if (nestedInput && typeof nestedInput.value === "string") {
+    return nestedInput.value.trim();
+  }
+
+  return "";
+}
+
 function closeMobileNav() {
   if (!navToggle || !siteNav) {
     return;
@@ -379,6 +397,13 @@ function initAddressAutocomplete() {
             addressCityField.value = address.city;
           }
         });
+
+        widget.addEventListener("blur", () => {
+          const widgetStreet = getWidgetStreetValue(widget);
+          if (widgetStreet && !String(addressStreetField.value || "").trim()) {
+            addressStreetField.value = widgetStreet;
+          }
+        }, true);
       } else if (typeof Autocomplete === "function") {
         const autocomplete = new Autocomplete(addressStreetField, {
           fields: ["address_components", "formatted_address"],
@@ -446,12 +471,21 @@ if (offerForm) {
   offerForm.addEventListener("submit", (event) => {
     const autocompleteWidget = addressAutocompleteShell?.querySelector("gmp-place-autocomplete");
     const usesWidget = Boolean(autocompleteWidget) && addressStreetField?.type === "hidden";
+    const postalCodeValue = String(addressPostalCodeField?.value || "").trim();
+    const cityValue = String(addressCityField?.value || "").trim();
+
+    if (usesWidget) {
+      const widgetStreetValue = getWidgetStreetValue(autocompleteWidget);
+      if (widgetStreetValue && !String(addressStreetField?.value || "").trim()) {
+        addressStreetField.value = widgetStreetValue;
+      }
+    }
+
     const missingAddressSelection =
       usesWidget
       && (
-        !String(addressStreetField?.value || "").trim()
-        || !String(addressPostalCodeField?.value || "").trim()
-        || !String(addressCityField?.value || "").trim()
+        !postalCodeValue
+        || !cityValue
       );
 
     if (!missingAddressSelection) {
