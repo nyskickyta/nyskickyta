@@ -6,6 +6,7 @@ require_once __DIR__ . '/customer_lookup.php';
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/services/invoice_base_totals.php';
 require_once __DIR__ . '/services/job_totals.php';
+require_once __DIR__ . '/services/entity_log.php';
 
 function seed_data(): array
 {
@@ -221,6 +222,12 @@ function seed_data(): array
                 'organization_id' => 1,
                 'region_id' => 1,
                 'is_active' => true,
+                'failed_login_attempts' => 0,
+                'locked_until' => '',
+                'last_login_at' => '',
+                'two_factor_enabled' => false,
+                'two_factor_secret' => '',
+                'two_factor_confirmed_at' => '',
                 'password_hash' => '$2y$12$lJF9fyX1/Yh1OXitwo3qGuLPcwH2r1fO7k38ymj83KbXRKWY5XRru',
                 'created_at' => '2026-03-15 08:00:00',
                 'updated_at' => '2026-03-15 08:00:00'
@@ -256,6 +263,7 @@ function seed_data(): array
             build_job_items_from_job($job3)
         ),
         'web_quote_requests' => [],
+        'entity_logs' => [],
     ];
 }
 
@@ -708,6 +716,8 @@ function normalize_user(array $user): array
         'id' => (int)($user['id'] ?? 0),
         'username' => (string)($user['username'] ?? ''),
         'name' => (string)($user['name'] ?? $user['username'] ?? 'Admin'),
+        'phone' => trim((string)($user['phone'] ?? $user['mobile'] ?? '')),
+        'email' => trim((string)($user['email'] ?? '')),
         'role' => normalize_user_role((string)($user['role'] ?? USER_ROLE_WORKER)),
         'organization_id' => ($user['organization_id'] ?? $user['organizationId'] ?? null) !== null && ($user['organization_id'] ?? $user['organizationId']) !== ''
             ? (int)($user['organization_id'] ?? $user['organizationId'])
@@ -721,6 +731,12 @@ function normalize_user(array $user): array
             is_array($user['effective_roles'] ?? null) ? $user['effective_roles'] : [(string)($user['role'] ?? USER_ROLE_WORKER)]
         ))),
         'is_active' => !array_key_exists('is_active', $user) || !empty($user['is_active']),
+        'failed_login_attempts' => max(0, (int)($user['failed_login_attempts'] ?? $user['failedLoginAttempts'] ?? 0)),
+        'locked_until' => trim((string)($user['locked_until'] ?? $user['lockedUntil'] ?? '')),
+        'last_login_at' => trim((string)($user['last_login_at'] ?? $user['lastLoginAt'] ?? '')),
+        'two_factor_enabled' => !empty($user['two_factor_enabled'] ?? $user['twoFactorEnabled'] ?? false),
+        'two_factor_secret' => strtoupper(trim((string)($user['two_factor_secret'] ?? $user['twoFactorSecret'] ?? ''))),
+        'two_factor_confirmed_at' => trim((string)($user['two_factor_confirmed_at'] ?? $user['twoFactorConfirmedAt'] ?? '')),
         'password_hash' => (string)($user['password_hash'] ?? ''),
         'created_at' => (string)($user['created_at'] ?? now_iso()),
         'updated_at' => (string)($user['updated_at'] ?? now_iso()),
@@ -734,14 +750,448 @@ function user_form_defaults(?array $user = null): array
     return [
         'username' => (string)($user['username'] ?? ''),
         'name' => (string)($user['name'] ?? ''),
+        'phone' => (string)($user['phone'] ?? ''),
+        'email' => (string)($user['email'] ?? ''),
         'role' => $roles[0] ?? USER_ROLE_WORKER,
         'roles' => $roles,
         'organizationId' => ($user['organization_id'] ?? null) !== null ? (string)($user['organization_id']) : '',
         'regionId' => ($user['region_id'] ?? null) !== null ? (string)($user['region_id']) : '',
         'isActive' => !array_key_exists('is_active', (array)$user) || !empty($user['is_active']) ? '1' : '0',
+        'twoFactorEnabled' => !empty($user['two_factor_enabled']) ? '1' : '0',
         'password' => '',
         'passwordConfirm' => '',
     ];
+}
+
+function login_lockout_max_attempts(): int
+{
+    if (is_dev_environment()) {
+        return 1000;
+    }
+
+    return 5;
+}
+
+function login_lockout_duration_minutes(): int
+{
+    if (is_dev_environment()) {
+        return 0;
+    }
+
+    return 15;
+}
+
+function user_lock_is_active(array $user, ?string $now = null): bool
+{
+    if (is_dev_environment()) {
+        return false;
+    }
+
+    $lockedUntil = trim((string)($user['locked_until'] ?? ''));
+    if ($lockedUntil === '') {
+        return false;
+    }
+
+    $lockedTimestamp = strtotime($lockedUntil);
+    $nowTimestamp = strtotime($now ?? now_iso());
+
+    return $lockedTimestamp !== false && $nowTimestamp !== false && $lockedTimestamp > $nowTimestamp;
+}
+
+function user_lock_remaining_minutes(array $user, ?string $now = null): int
+{
+    if (!user_lock_is_active($user, $now)) {
+        return 0;
+    }
+
+    $lockedTimestamp = strtotime((string)($user['locked_until'] ?? ''));
+    $nowTimestamp = strtotime($now ?? now_iso());
+    if ($lockedTimestamp === false || $nowTimestamp === false) {
+        return 0;
+    }
+
+    return max(1, (int)ceil(($lockedTimestamp - $nowTimestamp) / 60));
+}
+
+function login_attempt_bucket_key(string $username, string $ip): string
+{
+    return mb_strtolower(trim($username), 'UTF-8') . '|' . trim($ip);
+}
+
+function get_session_login_attempts(): array
+{
+    $attempts = $_SESSION['login_attempts'] ?? [];
+
+    return is_array($attempts) ? $attempts : [];
+}
+
+function set_session_login_attempts(array $attempts): void
+{
+    $_SESSION['login_attempts'] = $attempts;
+}
+
+function bucket_login_attempts(string $username, string $ip): array
+{
+    $attempts = get_session_login_attempts();
+    $attempt = $attempts[login_attempt_bucket_key($username, $ip)] ?? null;
+
+    return is_array($attempt) ? $attempt : ['count' => 0, 'locked_until' => ''];
+}
+
+function bucket_login_is_locked(string $username, string $ip): bool
+{
+    if (is_dev_environment()) {
+        return false;
+    }
+
+    $lockedUntil = trim((string)(bucket_login_attempts($username, $ip)['locked_until'] ?? ''));
+    if ($lockedUntil === '') {
+        return false;
+    }
+
+    $lockedTimestamp = strtotime($lockedUntil);
+
+    return $lockedTimestamp !== false && $lockedTimestamp > time();
+}
+
+function bucket_login_remaining_minutes(string $username, string $ip): int
+{
+    if (is_dev_environment()) {
+        return 0;
+    }
+
+    $lockedUntil = trim((string)(bucket_login_attempts($username, $ip)['locked_until'] ?? ''));
+    $lockedTimestamp = strtotime($lockedUntil);
+    if ($lockedTimestamp === false || $lockedTimestamp <= time()) {
+        return 0;
+    }
+
+    return max(1, (int)ceil(($lockedTimestamp - time()) / 60));
+}
+
+function register_failed_login_attempt(string $username, string $ip, ?array $user = null): ?array
+{
+    if (is_dev_environment()) {
+        return $user !== null ? normalize_user($user) : null;
+    }
+
+    $attempts = get_session_login_attempts();
+    $key = login_attempt_bucket_key($username, $ip);
+    $attempt = $attempts[$key] ?? ['count' => 0, 'locked_until' => ''];
+    $count = max(0, (int)($attempt['count'] ?? 0)) + 1;
+    $lockedUntil = '';
+
+    if ($count >= login_lockout_max_attempts()) {
+        $lockedUntil = date('Y-m-d H:i:s', strtotime('+' . login_lockout_duration_minutes() . ' minutes'));
+        $count = 0;
+    }
+
+    $attempts[$key] = [
+        'count' => $count,
+        'locked_until' => $lockedUntil,
+    ];
+    set_session_login_attempts($attempts);
+
+    if ($user === null || !mysql_is_configured() || !user_security_schema_ready()) {
+        auth_log_write(
+            (int)($user['id'] ?? 0),
+            $lockedUntil !== '' ? 'login_locked' : 'login_failed',
+            'Misslyckad inloggning för ' . trim($username) . ' från ' . trim($ip) . ($lockedUntil !== '' ? '. Tillfällig spärr aktiverad.' : '.')
+        );
+        return null;
+    }
+
+    $user = normalize_user($user);
+    $nextAttempts = max(0, (int)($user['failed_login_attempts'] ?? 0)) + 1;
+    $userLockedUntil = '';
+
+    if ($nextAttempts >= login_lockout_max_attempts()) {
+        $userLockedUntil = date('Y-m-d H:i:s', strtotime('+' . login_lockout_duration_minutes() . ' minutes'));
+        $nextAttempts = 0;
+    }
+
+    $timestamp = now_iso();
+    $pdo = admin_pdo();
+    $statement = $pdo->prepare(
+        'UPDATE users
+         SET failed_login_attempts = :failed_login_attempts,
+             locked_until = :locked_until,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+    $statement->execute([
+        'failed_login_attempts' => $nextAttempts,
+        'locked_until' => mysql_nullable_string($userLockedUntil),
+        'updated_at' => $timestamp,
+        'id' => (int)($user['id'] ?? 0),
+    ]);
+
+    $user['failed_login_attempts'] = $nextAttempts;
+    $user['locked_until'] = $userLockedUntil;
+    $user['updated_at'] = $timestamp;
+
+    auth_log_write(
+        (int)($user['id'] ?? 0),
+        $userLockedUntil !== '' ? 'login_locked' : 'login_failed',
+        'Misslyckad inloggning för ' . (string)($user['username'] ?? trim($username)) . ' från ' . trim($ip) . ($userLockedUntil !== '' ? '. Kontot låstes tillfälligt.' : '.')
+    );
+
+    return normalize_user($user);
+}
+
+function clear_login_attempts(string $username, string $ip): void
+{
+    $attempts = get_session_login_attempts();
+    unset($attempts[login_attempt_bucket_key($username, $ip)]);
+    set_session_login_attempts($attempts);
+}
+
+function register_successful_login(array $user, string $ip): array
+{
+    $user = normalize_user($user);
+    clear_login_attempts((string)($user['username'] ?? ''), $ip);
+
+    $timestamp = now_iso();
+    $user['failed_login_attempts'] = 0;
+    $user['locked_until'] = '';
+    $user['last_login_at'] = $timestamp;
+    $user['updated_at'] = $timestamp;
+
+    auth_log_write(
+        (int)($user['id'] ?? 0),
+        'login_success',
+        'Lyckad inloggning för ' . (string)($user['username'] ?? '') . ' från ' . trim($ip) . '.'
+    );
+
+    if (!mysql_is_configured() || !user_security_schema_ready()) {
+        return normalize_user($user);
+    }
+
+    $pdo = admin_pdo();
+    $statement = $pdo->prepare(
+        'UPDATE users
+         SET failed_login_attempts = 0,
+             locked_until = NULL,
+             last_login_at = :last_login_at,
+             updated_at = :updated_at
+         WHERE id = :id'
+    );
+    $statement->execute([
+        'last_login_at' => $timestamp,
+        'updated_at' => $timestamp,
+        'id' => (int)($user['id'] ?? 0),
+    ]);
+
+    return normalize_user($user);
+}
+
+function prepare_user_two_factor(int $userId): array
+{
+    $data = load_data();
+    $user = find_user_by_id($data, $userId);
+    if ($user === null) {
+        throw new RuntimeException('Användaren kunde inte hittas.');
+    }
+
+    if (!in_array(USER_ROLE_ADMIN, normalize_role_list($user['effective_roles'] ?? ($user['role'] ?? USER_ROLE_WORKER)), true)) {
+        throw new RuntimeException('2FA kan bara aktiveras för adminanvändare.');
+    }
+
+    $user = normalize_user($user);
+    $user['two_factor_secret'] = generate_two_factor_secret();
+    $user['two_factor_enabled'] = false;
+    $user['two_factor_confirmed_at'] = '';
+    $user['updated_at'] = now_iso();
+
+    if (mysql_is_configured() && user_security_schema_ready()) {
+        $pdo = admin_pdo();
+        $statement = $pdo->prepare(
+            'UPDATE users
+             SET two_factor_enabled = 0,
+                 two_factor_secret = :two_factor_secret,
+                 two_factor_confirmed_at = NULL,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'two_factor_secret' => (string)$user['two_factor_secret'],
+            'updated_at' => (string)$user['updated_at'],
+            'id' => $userId,
+        ]);
+    } else {
+        $data['users'] = array_map(static function (array $candidate) use ($userId, $user): array {
+            return (int)($candidate['id'] ?? 0) === $userId ? normalize_user($user) : $candidate;
+        }, $data['users'] ?? []);
+        save_data($data);
+    }
+
+    auth_log_write(
+        $userId,
+        'two_factor_prepared',
+        '2FA-hemlighet skapades för ' . (string)($user['username'] ?? '') . '.'
+    );
+
+    return normalize_user($user);
+}
+
+function confirm_user_two_factor(int $userId, string $code): array
+{
+    $data = load_data();
+    $user = find_user_by_id($data, $userId);
+    if ($user === null) {
+        throw new RuntimeException('Användaren kunde inte hittas.');
+    }
+
+    $user = normalize_user($user);
+    $secret = (string)($user['two_factor_secret'] ?? '');
+
+    if (!is_valid_base32_secret($secret)) {
+        throw new RuntimeException('Skapa först en 2FA-hemlighet.');
+    }
+
+    if (!verify_two_factor_code($secret, $code)) {
+        throw new RuntimeException('Koden kunde inte verifieras. Kontrollera appen och prova igen.');
+    }
+
+    $timestamp = now_iso();
+    $user['two_factor_enabled'] = true;
+    $user['two_factor_confirmed_at'] = $timestamp;
+    $user['updated_at'] = $timestamp;
+
+    if (mysql_is_configured() && user_security_schema_ready()) {
+        $pdo = admin_pdo();
+        $statement = $pdo->prepare(
+            'UPDATE users
+             SET two_factor_enabled = 1,
+                 two_factor_confirmed_at = :two_factor_confirmed_at,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'two_factor_confirmed_at' => $timestamp,
+            'updated_at' => $timestamp,
+            'id' => $userId,
+        ]);
+    } else {
+        $data['users'] = array_map(static function (array $candidate) use ($userId, $user): array {
+            return (int)($candidate['id'] ?? 0) === $userId ? normalize_user($user) : $candidate;
+        }, $data['users'] ?? []);
+        save_data($data);
+    }
+
+    auth_log_write(
+        $userId,
+        'two_factor_enabled',
+        '2FA aktiverades för ' . (string)($user['username'] ?? '') . '.'
+    );
+
+    return normalize_user($user);
+}
+
+function disable_user_two_factor(int $userId): array
+{
+    $data = load_data();
+    $user = find_user_by_id($data, $userId);
+    if ($user === null) {
+        throw new RuntimeException('Användaren kunde inte hittas.');
+    }
+
+    $user = normalize_user($user);
+    $timestamp = now_iso();
+    $user['two_factor_enabled'] = false;
+    $user['two_factor_secret'] = '';
+    $user['two_factor_confirmed_at'] = '';
+    $user['updated_at'] = $timestamp;
+
+    if (mysql_is_configured() && user_security_schema_ready()) {
+        $pdo = admin_pdo();
+        $statement = $pdo->prepare(
+            'UPDATE users
+             SET two_factor_enabled = 0,
+                 two_factor_secret = \'\',
+                 two_factor_confirmed_at = NULL,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'updated_at' => $timestamp,
+            'id' => $userId,
+        ]);
+    } else {
+        $data['users'] = array_map(static function (array $candidate) use ($userId, $user): array {
+            return (int)($candidate['id'] ?? 0) === $userId ? normalize_user($user) : $candidate;
+        }, $data['users'] ?? []);
+        save_data($data);
+    }
+
+    auth_log_write(
+        $userId,
+        'two_factor_disabled',
+        '2FA stängdes av för ' . (string)($user['username'] ?? '') . '.'
+    );
+
+    return normalize_user($user);
+}
+
+function reset_user_login_lock(int $userId): array
+{
+    $data = load_data();
+    $user = find_user_by_id($data, $userId);
+    if ($user === null) {
+        throw new RuntimeException('Användaren kunde inte hittas.');
+    }
+
+    $user = normalize_user($user);
+    $timestamp = now_iso();
+    $user['failed_login_attempts'] = 0;
+    $user['locked_until'] = '';
+    $user['updated_at'] = $timestamp;
+
+    if (mysql_is_configured() && user_security_schema_ready()) {
+        $pdo = admin_pdo();
+        $statement = $pdo->prepare(
+            'UPDATE users
+             SET failed_login_attempts = 0,
+                 locked_until = NULL,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $statement->execute([
+            'updated_at' => $timestamp,
+            'id' => $userId,
+        ]);
+    } else {
+        $data['users'] = array_map(static function (array $candidate) use ($userId, $user): array {
+            return (int)($candidate['id'] ?? 0) === $userId ? normalize_user($user) : $candidate;
+        }, $data['users'] ?? []);
+        save_data($data);
+    }
+
+    auth_log_write(
+        $userId,
+        'login_lock_reset',
+        'Inloggningsspärr nollställdes för ' . (string)($user['username'] ?? '') . '.'
+    );
+
+    return normalize_user($user);
+}
+
+function auth_log_write(int $userId, string $action, string $message): void
+{
+    if (!mysql_is_configured()) {
+        return;
+    }
+
+    try {
+        $pdo = admin_pdo();
+        if (!mysql_table_exists($pdo, 'entity_logs')) {
+            return;
+        }
+
+        entity_log_write($pdo, 'user', $userId, $action, $message);
+    } catch (Throwable) {
+        // Security logging must never break primary auth flow.
+    }
 }
 
 function valid_product_item_types(): array
@@ -1138,6 +1588,17 @@ function validate_user_payload(array $payload, bool $isUpdate = false): array
         $errors['name'] = 'Namn krävs.';
     }
 
+    if (trim((string)($payload['phone'] ?? '')) === '') {
+        $errors['phone'] = 'Mobilnummer krävs.';
+    }
+
+    $email = trim((string)($payload['email'] ?? ''));
+    if ($email === '') {
+        $errors['email'] = 'E-post krävs.';
+    } elseif (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $errors['email'] = 'Ogiltig e-postadress.';
+    }
+
     $rawRoles = $payload['roles'] ?? ($payload['role'] ?? []);
     if (!is_array($rawRoles)) {
         $rawRoles = [$rawRoles];
@@ -1198,11 +1659,19 @@ function build_user_record(array $payload, ?array $existingUser = null): array
         'id' => (int)($existingUser['id'] ?? $payload['id'] ?? 0),
         'username' => trim((string)($payload['username'] ?? '')),
         'name' => trim((string)($payload['name'] ?? '')),
+        'phone' => trim((string)($payload['phone'] ?? '')),
+        'email' => trim((string)($payload['email'] ?? '')),
         'role' => $roles[0] ?? USER_ROLE_WORKER,
         'effective_roles' => $roles,
         'organization_id' => trim((string)($payload['organizationId'] ?? '')) !== '' ? (int)($payload['organizationId'] ?? 0) : null,
         'region_id' => trim((string)($payload['regionId'] ?? '')) !== '' ? (int)($payload['regionId'] ?? 0) : null,
         'is_active' => (string)($payload['isActive'] ?? '1') !== '0',
+        'failed_login_attempts' => (int)($existingUser['failed_login_attempts'] ?? 0),
+        'locked_until' => (string)($existingUser['locked_until'] ?? ''),
+        'last_login_at' => (string)($existingUser['last_login_at'] ?? ''),
+        'two_factor_enabled' => !empty($existingUser['two_factor_enabled']),
+        'two_factor_secret' => (string)($existingUser['two_factor_secret'] ?? ''),
+        'two_factor_confirmed_at' => (string)($existingUser['two_factor_confirmed_at'] ?? ''),
         'password_hash' => $passwordHash,
         'created_at' => (string)($existingUser['created_at'] ?? $now),
         'updated_at' => $now,
@@ -1242,6 +1711,8 @@ function normalize_customer(array $customer): array
         'customer_type' => $customerType,
         'billing_vat_mode' => $billingVatMode,
         'service_type' => normalize_customer_service_type((string)($customer['service_type'] ?? $customer['serviceType'] ?? 'single')),
+        'maintenance_plan_deck' => customer_has_maintenance_plan($customer, 'deck'),
+        'maintenance_plan_stone' => customer_has_maintenance_plan($customer, 'stone'),
         'organization_id' => ($customer['organization_id'] ?? $customer['organizationId'] ?? null) !== null && ($customer['organization_id'] ?? $customer['organizationId']) !== ''
             ? (int)($customer['organization_id'] ?? $customer['organizationId'])
             : null,
@@ -2081,6 +2552,19 @@ function normalize_data(array $data): array
         'web_quote_requests' => array_map('normalize_web_quote_request', $data['web_quote_requests'] ?? $data['webQuoteRequests'] ?? []),
         'invoice_bases' => $invoiceBases,
         'invoice_base_items' => $invoiceBaseItems,
+        'entity_logs' => array_values(array_filter(
+            array_map(static function (array $log): array {
+                return [
+                    'id' => (int)($log['id'] ?? 0),
+                    'entity_type' => (string)($log['entity_type'] ?? $log['entityType'] ?? ''),
+                    'entity_id' => (int)($log['entity_id'] ?? $log['entityId'] ?? 0),
+                    'action' => (string)($log['action'] ?? ''),
+                    'message' => (string)($log['message'] ?? ''),
+                    'created_at' => (string)($log['created_at'] ?? $log['createdAt'] ?? now_iso()),
+                ];
+            }, $data['entity_logs'] ?? $data['entityLogs'] ?? []),
+            static fn(array $log): bool => (int)($log['id'] ?? 0) > 0
+        )),
     ];
 }
 
@@ -2182,6 +2666,8 @@ function mysql_customer_params(array $record): array
         'billing_vat_mode' => $record['billing_vat_mode'],
         'name' => $record['name'],
         'service_type' => normalize_customer_service_type((string)($record['service_type'] ?? 'single')),
+        'maintenance_plan_deck' => !empty($record['maintenance_plan_deck']) ? 1 : 0,
+        'maintenance_plan_stone' => !empty($record['maintenance_plan_stone']) ? 1 : 0,
         'organization_id' => ($record['organization_id'] ?? null) !== null ? (int)$record['organization_id'] : null,
         'region_id' => ($record['region_id'] ?? null) !== null ? (int)$record['region_id'] : null,
         'first_name' => $record['customer_type'] === 'private' ? ((string)($record['first_name'] ?? '') !== '' ? $record['first_name'] : $firstName) : null,
@@ -2220,10 +2706,18 @@ function mysql_user_params(array $record): array
         'id' => (int)($record['id'] ?? 0),
         'username' => (string)($record['username'] ?? ''),
         'name' => (string)($record['name'] ?? ''),
+        'phone' => (string)($record['phone'] ?? ''),
+        'email' => (string)($record['email'] ?? ''),
         'role' => normalize_user_role((string)($record['role'] ?? USER_ROLE_WORKER)),
         'organization_id' => ($record['organization_id'] ?? null) !== null ? (int)$record['organization_id'] : null,
         'region_id' => ($record['region_id'] ?? null) !== null ? (int)$record['region_id'] : null,
         'is_active' => !empty($record['is_active']) ? 1 : 0,
+        'failed_login_attempts' => max(0, (int)($record['failed_login_attempts'] ?? 0)),
+        'locked_until' => mysql_nullable_string($record['locked_until'] ?? null),
+        'last_login_at' => mysql_nullable_string($record['last_login_at'] ?? null),
+        'two_factor_enabled' => !empty($record['two_factor_enabled']) ? 1 : 0,
+        'two_factor_secret' => (string)($record['two_factor_secret'] ?? ''),
+        'two_factor_confirmed_at' => mysql_nullable_string($record['two_factor_confirmed_at'] ?? null),
         'password_hash' => (string)($record['password_hash'] ?? ''),
         'created_at' => (string)($record['created_at'] ?? now_iso()),
         'updated_at' => (string)($record['updated_at'] ?? now_iso()),
@@ -2363,12 +2857,12 @@ function mysql_persist_customer_record(PDO $pdo, array $record, bool $isInsert):
     if ($isInsert) {
         $statement = $pdo->prepare(
             'INSERT INTO customers (
-                id, customer_type, billing_vat_mode, service_type, name, organization_id, region_id, first_name, last_name, company_name, association_name, contact_person,
+                id, customer_type, billing_vat_mode, service_type, maintenance_plan_deck, maintenance_plan_stone, name, organization_id, region_id, first_name, last_name, company_name, association_name, contact_person,
                 phone, email, billing_address_1, billing_address_2, billing_postcode, billing_city,
                 property_address_1, property_address_2, property_postcode, property_city, property_designation,
                 personal_number, organization_number, vat_number, rut_enabled, rut_used_amount_this_year, last_service_date, next_service_date, notes, created_at, updated_at, last_activity
              ) VALUES (
-                :id, :customer_type, :billing_vat_mode, :service_type, :name, :organization_id, :region_id, :first_name, :last_name, :company_name, :association_name, :contact_person,
+                :id, :customer_type, :billing_vat_mode, :service_type, :maintenance_plan_deck, :maintenance_plan_stone, :name, :organization_id, :region_id, :first_name, :last_name, :company_name, :association_name, :contact_person,
                 :phone, :email, :billing_address_1, :billing_address_2, :billing_postcode, :billing_city,
                 :property_address_1, :property_address_2, :property_postcode, :property_city, :property_designation,
                 :personal_number, :organization_number, :vat_number, :rut_enabled, :rut_used_amount_this_year, :last_service_date, :next_service_date, :notes, :created_at, :updated_at, :last_activity
@@ -2380,6 +2874,8 @@ function mysql_persist_customer_record(PDO $pdo, array $record, bool $isInsert):
                 customer_type = :customer_type,
                 billing_vat_mode = :billing_vat_mode,
                 service_type = :service_type,
+                maintenance_plan_deck = :maintenance_plan_deck,
+                maintenance_plan_stone = :maintenance_plan_stone,
                 name = :name,
                 organization_id = :organization_id,
                 region_id = :region_id,
@@ -2423,24 +2919,79 @@ function mysql_persist_user_record(PDO $pdo, array $record, bool $isInsert): arr
     $params = mysql_user_params($record);
 
     if ($isInsert) {
-        $statement = $pdo->prepare(
-            'INSERT INTO users (id, username, name, role, organization_id, region_id, is_active, password_hash, created_at, updated_at)
-             VALUES (:id, :username, :name, :role, :organization_id, :region_id, :is_active, :password_hash, :created_at, :updated_at)'
-        );
+        if (user_contact_schema_ready()) {
+            $statement = $pdo->prepare(
+                'INSERT INTO users (
+                    id, username, name, phone, email, role, organization_id, region_id, is_active,
+                    failed_login_attempts, locked_until, last_login_at,
+                    two_factor_enabled, two_factor_secret, two_factor_confirmed_at,
+                    password_hash, created_at, updated_at
+                ) VALUES (
+                    :id, :username, :name, :phone, :email, :role, :organization_id, :region_id, :is_active,
+                    :failed_login_attempts, :locked_until, :last_login_at,
+                    :two_factor_enabled, :two_factor_secret, :two_factor_confirmed_at,
+                    :password_hash, :created_at, :updated_at
+                )'
+            );
+        } else {
+            $statement = $pdo->prepare(
+                'INSERT INTO users (
+                    id, username, name, role, organization_id, region_id, is_active,
+                    failed_login_attempts, locked_until, last_login_at,
+                    two_factor_enabled, two_factor_secret, two_factor_confirmed_at,
+                    password_hash, created_at, updated_at
+                ) VALUES (
+                    :id, :username, :name, :role, :organization_id, :region_id, :is_active,
+                    :failed_login_attempts, :locked_until, :last_login_at,
+                    :two_factor_enabled, :two_factor_secret, :two_factor_confirmed_at,
+                    :password_hash, :created_at, :updated_at
+                )'
+            );
+        }
     } else {
-        $statement = $pdo->prepare(
-            'UPDATE users SET
-                username = :username,
-                name = :name,
-                role = :role,
-                organization_id = :organization_id,
-                region_id = :region_id,
-                is_active = :is_active,
-                password_hash = :password_hash,
-                created_at = :created_at,
-                updated_at = :updated_at
-             WHERE id = :id'
-        );
+        if (user_contact_schema_ready()) {
+            $statement = $pdo->prepare(
+                'UPDATE users SET
+                    username = :username,
+                    name = :name,
+                    phone = :phone,
+                    email = :email,
+                    role = :role,
+                    organization_id = :organization_id,
+                    region_id = :region_id,
+                    is_active = :is_active,
+                    failed_login_attempts = :failed_login_attempts,
+                    locked_until = :locked_until,
+                    last_login_at = :last_login_at,
+                    two_factor_enabled = :two_factor_enabled,
+                    two_factor_secret = :two_factor_secret,
+                    two_factor_confirmed_at = :two_factor_confirmed_at,
+                    password_hash = :password_hash,
+                    created_at = :created_at,
+                    updated_at = :updated_at
+                 WHERE id = :id'
+            );
+        } else {
+            $statement = $pdo->prepare(
+                'UPDATE users SET
+                    username = :username,
+                    name = :name,
+                    role = :role,
+                    organization_id = :organization_id,
+                    region_id = :region_id,
+                    is_active = :is_active,
+                    failed_login_attempts = :failed_login_attempts,
+                    locked_until = :locked_until,
+                    last_login_at = :last_login_at,
+                    two_factor_enabled = :two_factor_enabled,
+                    two_factor_secret = :two_factor_secret,
+                    two_factor_confirmed_at = :two_factor_confirmed_at,
+                    password_hash = :password_hash,
+                    created_at = :created_at,
+                    updated_at = :updated_at
+                 WHERE id = :id'
+            );
+        }
     }
 
     $statement->execute($params);
@@ -2887,16 +3438,23 @@ function recalculateInvoiceBaseTotals(PDO $pdo, int $invoiceBaseId): array
     return InvoiceBaseTotalsService::recalculateInvoiceBaseTotals($pdo, $invoiceBaseId);
 }
 
+function mysql_find_persisted_invoice_basis_by_job_id(PDO $pdo, int $jobId): ?array
+{
+    if (!mysql_table_exists($pdo, 'invoice_bases')) {
+        return null;
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM invoice_bases WHERE job_id = :job_id LIMIT 1');
+    $statement->execute(['job_id' => $jobId]);
+    $record = $statement->fetch(PDO::FETCH_ASSOC);
+
+    return is_array($record) ? normalize_invoice_basis($record) : null;
+}
+
 function mysql_sync_invoice_basis_for_job(PDO $pdo, int $jobId): void
 {
     $data = load_data_mysql();
-    $existingBasis = null;
-    foreach ($data['invoice_bases'] ?? [] as $basis) {
-        if ((int)($basis['job_id'] ?? 0) === $jobId) {
-            $existingBasis = $basis;
-            break;
-        }
-    }
+    $existingBasis = mysql_find_persisted_invoice_basis_by_job_id($pdo, $jobId);
 
     $job = find_by_id($data['jobs'] ?? [], $jobId);
     if ($job === null) {
@@ -3273,7 +3831,20 @@ function mysql_save_customer(array $payload, ?array $existingCustomer = null): a
     $pdo->beginTransaction();
 
     try {
+        $data = load_data_mysql();
         $record = build_customer_record($payload, $existingCustomer);
+        if (($record['customer_type'] ?? 'private') === 'private') {
+            $duplicateCustomer = find_customer_by_personal_number(
+                $data['customers'] ?? [],
+                (string)($record['personal_number'] ?? ''),
+                $existingCustomer ? (int)($existingCustomer['id'] ?? 0) : null
+            );
+
+            if ($duplicateCustomer !== null) {
+                throw new RuntimeException('Det finns redan en kund med samma personnummer.');
+            }
+        }
+
         if ($existingCustomer === null) {
             $record['id'] = mysql_next_table_id($pdo, 'customers');
             mysql_persist_customer_record($pdo, $record, true);
@@ -3294,7 +3865,7 @@ function mysql_save_customer(array $payload, ?array $existingCustomer = null): a
 
 function mysql_update_customer_maintenance_dates_for_completed_job(array $customer, array $job): void
 {
-    if (normalize_customer_service_type((string)($customer['service_type'] ?? 'single')) !== 'maintenance') {
+    if (!customer_has_maintenance_plan($customer)) {
         return;
     }
 
@@ -3309,12 +3880,63 @@ function mysql_update_customer_maintenance_dates_for_completed_job(array $custom
     }
 
     try {
-        $nextServiceDate = (new DateTimeImmutable($completedDate))->modify('+12 months')->format('Y-m-d');
+        $nextMaintenanceJobDate = (new DateTimeImmutable($completedDate))->modify('+11 months')->format('Y-m-d');
     } catch (Throwable) {
-        $nextServiceDate = date('Y-m-d', strtotime('+12 months'));
+        $nextMaintenanceJobDate = date('Y-m-d', strtotime('+11 months'));
     }
 
     $pdo = admin_pdo();
+    mysql_schedule_next_maintenance_job($pdo, $customer, $job, $nextMaintenanceJobDate);
+    mysql_refresh_customer_maintenance_summary($pdo, $customerId);
+}
+
+function is_maintenance_job_service_type(string $serviceType): bool
+{
+    return in_array(trim($serviceType), [
+        'Årligt underhåll stenytor',
+        'Årligt underhåll trädäck',
+        'Årligt underhåll',
+    ], true);
+}
+
+function mysql_refresh_customer_maintenance_summary(PDO $pdo, int $customerId): void
+{
+    if ($customerId <= 0) {
+        return;
+    }
+
+    $latestCompletedStatement = $pdo->prepare(
+        'SELECT completed_date
+         FROM jobs
+         WHERE customer_id = :customer_id
+           AND completed_date IS NOT NULL
+           AND completed_date <> ""
+           AND service_type IN ("Årligt underhåll stenytor", "Årligt underhåll trädäck", "Årligt underhåll")
+           AND status IN ("completed", "invoiced")
+         ORDER BY completed_date DESC, id DESC
+         LIMIT 1'
+    );
+    $latestCompletedStatement->execute([
+        'customer_id' => $customerId,
+    ]);
+    $lastServiceDate = $latestCompletedStatement->fetchColumn();
+
+    $nextPlannedStatement = $pdo->prepare(
+        'SELECT scheduled_date
+         FROM jobs
+         WHERE customer_id = :customer_id
+           AND scheduled_date IS NOT NULL
+           AND scheduled_date <> ""
+           AND service_type IN ("Årligt underhåll stenytor", "Årligt underhåll trädäck", "Årligt underhåll")
+           AND status IN ("planned", "scheduled", "in_progress")
+         ORDER BY scheduled_date ASC, id ASC
+         LIMIT 1'
+    );
+    $nextPlannedStatement->execute([
+        'customer_id' => $customerId,
+    ]);
+    $nextServiceDate = $nextPlannedStatement->fetchColumn();
+
     $statement = $pdo->prepare(
         'UPDATE customers
          SET last_service_date = :last_service_date,
@@ -3324,9 +3946,122 @@ function mysql_update_customer_maintenance_dates_for_completed_job(array $custom
     );
     $statement->execute([
         'id' => $customerId,
-        'last_service_date' => $completedDate,
-        'next_service_date' => $nextServiceDate,
+        'last_service_date' => $lastServiceDate !== false ? $lastServiceDate : null,
+        'next_service_date' => $nextServiceDate !== false ? $nextServiceDate : null,
     ]);
+}
+
+function infer_maintenance_job_service_type(array $job): string
+{
+    $serviceType = mb_strtolower(trim((string)($job['service_type'] ?? $job['serviceType'] ?? '')));
+    $description = mb_strtolower(trim((string)($job['description'] ?? '')));
+    $haystack = trim($serviceType . ' ' . $description);
+
+    if (
+        str_contains($haystack, 'sten')
+        || str_contains($haystack, 'marksten')
+        || str_contains($haystack, 'stentvätt')
+        || str_contains($haystack, 'stentvatt')
+        || str_contains($haystack, 'stenrengöring')
+        || str_contains($haystack, 'stenrengoring')
+    ) {
+        return 'Årligt underhåll stenytor';
+    }
+
+    if (
+        str_contains($haystack, 'altan')
+        || str_contains($haystack, 'trädäck')
+        || str_contains($haystack, 'tradack')
+        || str_contains($haystack, 'trädack')
+        || str_contains($haystack, 'altantvätt')
+        || str_contains($haystack, 'altantvatt')
+    ) {
+        return 'Årligt underhåll trädäck';
+    }
+
+    return 'Årligt underhåll';
+}
+
+function infer_maintenance_job_description(array $job, string $serviceType): string
+{
+    return match ($serviceType) {
+        'Årligt underhåll stenytor' => 'Planerat återkommande underhåll. Årlig tvätt och genomgång av stenytor enligt tecknat upplägg.',
+        'Årligt underhåll trädäck' => 'Planerat återkommande underhåll. Årlig tvätt och genomgång av trädäck enligt tecknat upplägg.',
+        default => 'Planerat återkommande underhåll enligt tecknat upplägg.',
+    };
+}
+
+function maintenance_service_type_kind(string $serviceType): string
+{
+    return match (trim($serviceType)) {
+        'Årligt underhåll trädäck' => 'deck',
+        'Årligt underhåll stenytor' => 'stone',
+        default => 'any',
+    };
+}
+
+function mysql_has_future_maintenance_job(PDO $pdo, int $customerId, string $serviceType, string $scheduledDate): bool
+{
+    $statement = $pdo->prepare(
+        'SELECT id
+         FROM jobs
+         WHERE customer_id = :customer_id
+           AND service_type = :service_type
+           AND scheduled_date >= :scheduled_date
+           AND status IN ("planned", "scheduled", "in_progress")
+         LIMIT 1'
+    );
+    $statement->execute([
+        'customer_id' => $customerId,
+        'service_type' => $serviceType,
+        'scheduled_date' => $scheduledDate,
+    ]);
+
+    return (bool)$statement->fetchColumn();
+}
+
+function mysql_schedule_next_maintenance_job(PDO $pdo, array $customer, array $job, string $scheduledDate): void
+{
+    $customerId = (int)($customer['id'] ?? 0);
+    if ($customerId <= 0 || $scheduledDate === '') {
+        return;
+    }
+
+    $serviceType = infer_maintenance_job_service_type($job);
+    if ($serviceType === '') {
+        return;
+    }
+
+    if (!customer_has_maintenance_plan($customer, maintenance_service_type_kind($serviceType))) {
+        return;
+    }
+
+    if (mysql_has_future_maintenance_job($pdo, $customerId, $serviceType, $scheduledDate)) {
+        return;
+    }
+
+    $payload = [
+        'customerId' => $customerId,
+        'quoteId' => '',
+        'organizationId' => (string)($customer['organization_id'] ?? ''),
+        'regionId' => (string)($customer['region_id'] ?? ''),
+        'serviceType' => $serviceType,
+        'description' => infer_maintenance_job_description($job, $serviceType),
+        'scheduledDate' => $scheduledDate,
+        'scheduledTime' => '',
+        'completedDate' => '',
+        'assignedTo' => '',
+        'status' => 'planned',
+        'finalLaborAmountExVat' => 0,
+        'finalMaterialAmountExVat' => 0,
+        'finalOtherAmountExVat' => 0,
+        'readyForInvoicing' => false,
+        'notes' => 'Skapat automatiskt från tecknat årligt underhåll.',
+    ];
+
+    $nextJob = build_job_record($payload, $customer, null);
+    $nextJob['id'] = mysql_next_table_id($pdo, 'jobs');
+    mysql_persist_job_record($pdo, $nextJob, true);
 }
 
 function mysql_save_quote(array $payload, array $customerPayload, ?array $existingQuote = null, ?int $preferredCustomerId = null): array
@@ -3504,12 +4239,51 @@ function customer_primary_identifier(array $customer): string
     return trim((string)($customer['personal_number'] ?? ''));
 }
 
+function canonical_personal_number(string $value): string
+{
+    $digits = preg_replace('/\D+/', '', trim($value));
+    if ($digits === null) {
+        return '';
+    }
+
+    if (strlen($digits) === 12) {
+        return substr($digits, -10);
+    }
+
+    return $digits;
+}
+
+function find_customer_by_personal_number(array $customers, string $personalNumber, ?int $ignoreId = null): ?array
+{
+    $candidate = canonical_personal_number($personalNumber);
+    if ($candidate === '') {
+        return null;
+    }
+
+    foreach ($customers as $customer) {
+        if ($ignoreId !== null && (int)($customer['id'] ?? 0) === $ignoreId) {
+            continue;
+        }
+
+        if (($customer['customer_type'] ?? 'private') !== 'private') {
+            continue;
+        }
+
+        $existing = canonical_personal_number((string)($customer['personal_number'] ?? ''));
+        if ($existing !== '' && $existing === $candidate) {
+            return $customer;
+        }
+    }
+
+    return null;
+}
+
 function find_matching_customer(array $customers, array $payload, ?int $ignoreId = null): ?array
 {
     $customerType = normalize_customer_type((string)($payload['customerType'] ?? 'private'));
     $primaryIdentifier = in_array($customerType, ['company', 'association'], true)
         ? trim((string)($payload['organizationNumber'] ?? ''))
-        : trim((string)($payload['personalNumber'] ?? ''));
+        : canonical_personal_number((string)($payload['personalNumber'] ?? ''));
     $email = mb_strtolower(trim((string)($payload['email'] ?? '')), 'UTF-8');
     $name = mb_strtolower(trim((string)($payload['name'] ?? '')), 'UTF-8');
     $companyName = mb_strtolower(trim((string)($payload['companyName'] ?? '')), 'UTF-8');
@@ -3524,8 +4298,13 @@ function find_matching_customer(array $customers, array $payload, ?int $ignoreId
             continue;
         }
 
-        if ($primaryIdentifier !== '' && customer_primary_identifier($customer) === $primaryIdentifier) {
-            return $customer;
+        if ($primaryIdentifier !== '') {
+            $existingIdentifier = in_array($customerType, ['company', 'association'], true)
+                ? customer_primary_identifier($customer)
+                : canonical_personal_number(customer_primary_identifier($customer));
+            if ($existingIdentifier === $primaryIdentifier) {
+                return $customer;
+            }
         }
 
         if (in_array($customerType, ['company', 'association'], true) && trim((string)($payload['vatNumber'] ?? '')) !== '') {
@@ -4254,6 +5033,32 @@ function mysql_delete_service_package(int $packageId): void
         throw new RuntimeException('Paket-tabellerna saknas. Kör databasuppgraderingen först.');
     }
 
-    $statement = $pdo->prepare('DELETE FROM service_packages WHERE id = :id');
-    $statement->execute(['id' => $packageId]);
+    if ($packageId <= 0) {
+        throw new RuntimeException('Ogiltigt paket.');
+    }
+
+    $existsStatement = $pdo->prepare('SELECT id FROM service_packages WHERE id = :id LIMIT 1');
+    $existsStatement->execute(['id' => $packageId]);
+
+    if (!$existsStatement->fetchColumn()) {
+        throw new RuntimeException('Paketet kunde inte hittas.');
+    }
+
+    $pdo->beginTransaction();
+
+    try {
+        $deleteItems = $pdo->prepare('DELETE FROM service_package_items WHERE package_id = :package_id');
+        $deleteItems->execute(['package_id' => $packageId]);
+
+        $deletePackage = $pdo->prepare('DELETE FROM service_packages WHERE id = :id');
+        $deletePackage->execute(['id' => $packageId]);
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        throw $exception;
+    }
 }
