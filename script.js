@@ -30,6 +30,7 @@ const siteNav = document.querySelector(".site-nav");
 const siteHeader = document.querySelector(".site-header");
 const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
 const siteConfig = window.NYSKICK_SITE_CONFIG || {};
+const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
 const analyticsMeasurementId = "G-9TKSWWGZF7";
 const analyticsConsentKey = "nyskick_cookie_consent";
 const thankYouTrackedKey = "nyskick_generate_lead_tracked";
@@ -366,7 +367,7 @@ function initAddressAutocomplete() {
   loadGoogleMapsPlaces(apiKey, countryCode)
     .then(() => waitForGooglePlacesApi())
     .then(async ({ PlaceAutocompleteElement, Autocomplete }) => {
-      if (typeof PlaceAutocompleteElement === "function" && addressAutocompleteShell) {
+      if (!isSafariBrowser && typeof PlaceAutocompleteElement === "function" && addressAutocompleteShell) {
         const widget = new PlaceAutocompleteElement({
           includedRegionCodes: [countryCode.toUpperCase()],
         });
@@ -404,7 +405,7 @@ function initAddressAutocomplete() {
             addressStreetField.value = widgetStreet;
           }
         }, true);
-      } else if (typeof Autocomplete === "function") {
+      } else if (!isSafariBrowser && typeof Autocomplete === "function") {
         const autocomplete = new Autocomplete(addressStreetField, {
           fields: ["address_components", "formatted_address"],
           types: ["address"],
@@ -428,7 +429,10 @@ function initAddressAutocomplete() {
           }
         });
       } else {
-        throw new Error("Google PlaceAutocompleteElement is not available");
+        if (addressHelpText) {
+          addressHelpText.textContent = "Fyll i adress, postnummer och ort manuellt. Adresshjälpen används bara där den fungerar stabilt.";
+        }
+        return;
       }
 
       if (addressHelpText) {
