@@ -60,7 +60,7 @@ function trackLeadIfNeeded() {
     return;
   }
 
-  const isThankYouPage = /\/tack\.html$/.test(window.location.pathname);
+  const isThankYouPage = /\/tack(?:\.html)?$/.test(window.location.pathname);
   if (!isThankYouPage) {
     return;
   }
