@@ -174,6 +174,12 @@ function showFormStatus(message, status = "validation") {
   formStatus.textContent = message;
 }
 
+function encodeFormData(data) {
+  return Object.keys(data)
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`)
+    .join("&");
+}
+
 function getWidgetStreetValue(widget) {
   if (!widget) {
     return "";
@@ -472,7 +478,7 @@ if (formStatus) {
 }
 
 if (offerForm) {
-  offerForm.addEventListener("submit", (event) => {
+  offerForm.addEventListener("submit", async (event) => {
     const autocompleteWidget = addressAutocompleteShell?.querySelector("gmp-place-autocomplete");
     const usesWidget = Boolean(autocompleteWidget) && addressStreetField?.type === "hidden";
     const postalCodeValue = String(addressPostalCodeField?.value || "").trim();
@@ -493,6 +499,56 @@ if (offerForm) {
       );
 
     if (!missingAddressSelection) {
+      const submitButton = offerForm.querySelector('button[type="submit"]');
+      const formData = new FormData(offerForm);
+      const payload = {};
+
+      formData.forEach((value, key) => {
+        payload[key] = typeof value === "string" ? value : String(value);
+      });
+
+      if (!payload["form-name"]) {
+        payload["form-name"] = offerForm.getAttribute("name") || "quote-request";
+      }
+
+      event.preventDefault();
+
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = true;
+        submitButton.dataset.originalText = submitButton.textContent || "";
+        submitButton.textContent = "Skickar...";
+      }
+
+      if (formStatus) {
+        formStatus.hidden = true;
+        formStatus.textContent = "";
+      }
+
+      fetch("/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: encodeFormData(payload),
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Netlify form submit failed with status ${response.status}`);
+          }
+
+          window.location.assign("/tack/");
+        })
+        .catch((error) => {
+          console.error("Formuläret kunde inte skickas.", error);
+          showFormStatus(statusMessages.error, "error");
+        })
+        .finally(() => {
+          if (submitButton instanceof HTMLButtonElement) {
+            submitButton.disabled = false;
+            submitButton.textContent = submitButton.dataset.originalText || "Få prisförslag";
+          }
+        });
+
       return;
     }
 
