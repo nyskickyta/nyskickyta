@@ -31,6 +31,7 @@ const siteHeader = document.querySelector(".site-header");
 const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
 const siteConfig = window.NYSKICK_SITE_CONFIG || {};
 const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
+const quoteFormEndpoint = String(siteConfig.quoteFormEndpoint || "").trim();
 const analyticsMeasurementId = "G-9TKSWWGZF7";
 const analyticsConsentKey = "nyskick_cookie_consent";
 const thankYouTrackedKey = "nyskick_generate_lead_tracked";
@@ -524,16 +525,31 @@ if (offerForm) {
         formStatus.textContent = "";
       }
 
-      fetch("/", {
+      const targetUrl = quoteFormEndpoint || "/";
+      const payloadBody = encodeFormData(payload);
+      const requestOptions = {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: encodeFormData(payload),
-      })
+        body: payloadBody,
+      };
+
+      fetch(targetUrl, requestOptions)
         .then((response) => {
           if (!response.ok) {
             throw new Error(`Netlify form submit failed with status ${response.status}`);
+          }
+
+          if (quoteFormEndpoint) {
+            return response.json().catch(() => ({ ok: true }));
+          }
+
+          return { ok: true };
+        })
+        .then((data) => {
+          if (data && data.ok === false) {
+            throw new Error("Quote form endpoint returned an error state");
           }
 
           window.location.assign("/tack/");

@@ -44,11 +44,12 @@ function site_config_env(string $key, string $default = ''): string
 
 $googleMapsApiKey = site_config_env('GOOGLE_MAPS_API_KEY', '');
 $googleMapsCountry = site_config_env('GOOGLE_MAPS_AUTOCOMPLETE_COUNTRY', 'se');
+$quoteFormEndpoint = site_config_env('QUOTE_FORM_ENDPOINT', '');
 
 $config = [
     'googleMapsApiKey' => $googleMapsApiKey,
     'googleMapsAutocompleteCountry' => $googleMapsCountry,
+    'quoteFormEndpoint' => $quoteFormEndpoint,
 ];
 
 echo 'window.NYSKICK_SITE_CONFIG = ' . json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';';
-
