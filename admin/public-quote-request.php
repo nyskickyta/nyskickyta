@@ -36,6 +36,60 @@ function public_quote_response(array $payload, int $status = 200): never
     exit;
 }
 
+function normalized_email_value(string $value): string
+{
+    $email = trim($value);
+    return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+}
+
+function web_quote_mail_recipients(array $organization, array $data): array
+{
+    $organizationId = (int)($organization['id'] ?? 0);
+    $regionId = (int)($organization['region_id'] ?? 0);
+    $recipients = [];
+
+    foreach (($data['users'] ?? []) as $user) {
+        if (empty($user['is_active'])) {
+            continue;
+        }
+
+        $email = normalized_email_value((string)($user['email'] ?? ''));
+        if ($email === '') {
+            continue;
+        }
+
+        $userOrganizationId = (int)($user['organization_id'] ?? 0);
+        $userRegionId = (int)($user['region_id'] ?? 0);
+
+        if (($organizationId > 0 && $userOrganizationId === $organizationId) || ($regionId > 0 && $userRegionId === $regionId)) {
+            $recipients[] = $email;
+        }
+    }
+
+    foreach (($data['organization_memberships'] ?? []) as $membership) {
+        if ((int)($membership['organization_id'] ?? 0) !== $organizationId) {
+            continue;
+        }
+
+        $userId = (int)($membership['user_id'] ?? 0);
+        foreach (($data['users'] ?? []) as $user) {
+            if ((int)($user['id'] ?? 0) !== $userId || empty($user['is_active'])) {
+                continue;
+            }
+
+            $email = normalized_email_value((string)($user['email'] ?? ''));
+            if ($email !== '') {
+                $recipients[] = $email;
+            }
+            break;
+        }
+    }
+
+    $recipients[] = 'info@nyskickstenaltan.se';
+
+    return array_values(array_unique(array_filter($recipients, static fn(string $email): bool => $email !== '')));
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     public_quote_response(['ok' => false, 'error' => 'method_not_allowed'], 405);
 }
@@ -126,7 +180,23 @@ if ($urlCount > 1) {
     public_quote_response(['ok' => false, 'error' => 'review'], 422);
 }
 
-$to = 'info@nyskickstenaltan.se';
+$mailData = mysql_is_configured() ? load_data_mysql() : ['regions' => [], 'organizations' => [], 'users' => [], 'organization_memberships' => []];
+$selectedRegion = infer_region_from_postcode($servicePostalCode, $mailData['regions'] ?? []);
+$matchedOrganization = null;
+
+if ($selectedRegion !== null && !empty($selectedRegion['is_active'])) {
+    $matchedOrganization = find_active_organization_for_region($mailData['organizations'] ?? [], (int)($selectedRegion['id'] ?? 0));
+}
+
+if ($matchedOrganization === null) {
+    $matchedOrganization = find_dalarna_fallback_organization($mailData['organizations'] ?? [], $mailData['regions'] ?? []);
+}
+
+$recipients = $matchedOrganization !== null
+    ? web_quote_mail_recipients($matchedOrganization, $mailData)
+    : ['info@nyskickstenaltan.se'];
+
+$to = implode(',', $recipients);
 $subject = 'Ny offertförfrågan från nyskickstenaltan.se';
 $bodyLines = [
     'Ny offertförfrågan från hemsidan',
