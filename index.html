@@ -140,6 +140,7 @@
                 name="quote-request"
                 method="POST"
                 action="/tack.html"
+                netlify
                 data-netlify="true"
                 netlify-honeypot="website"
               >
@@ -247,6 +248,22 @@
           </div>
         </div>
       </section>
+      <form name="quote-request" method="POST" action="/tack.html" netlify data-netlify="true" netlify-honeypot="website" hidden>
+        <input type="hidden" name="form-name" value="quote-request" />
+        <input type="text" name="website" />
+        <input type="text" name="name" />
+        <input type="tel" name="phone" />
+        <input type="email" name="email" />
+        <input type="text" name="requestType" />
+        <input type="text" name="surfaceSize" />
+        <input type="text" name="growthLevel" />
+        <input type="text" name="hasDetails" />
+        <input type="text" name="serviceAddress" />
+        <input type="text" name="servicePostalCode" />
+        <input type="text" name="serviceCity" />
+        <input type="text" name="form_started" />
+        <input type="text" name="sourcePage" />
+      </form>
 
       <section class="trust-bar">
         <div class="container trust-items trust-items-wide">
