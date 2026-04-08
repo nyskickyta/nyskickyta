@@ -1,0 +1,21 @@
+# Secrets / env
+.env
+.env*
+!.env.example
+
+# Local config
+site-config.php
+site-config.js
+config.local.php
+
+# macOS
+.DS_Store
+
+# Uploads / generated
+uploads/
+cache/
+tmp/
+
+# Dependencies if they install on server
+vendor/
+node_modules/
