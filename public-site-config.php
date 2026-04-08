@@ -8,6 +8,10 @@ $allowedOrigins = [
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$googleAnalyticsMeasurementId = getenv('GOOGLE_ANALYTICS_MEASUREMENT_ID') ?: 'G-9TKSWWGZF7';
+$googleMapsApiKey = getenv('GOOGLE_MAPS_API_KEY') ?: '';
+$googleMapsAutocompleteCountry = getenv('GOOGLE_MAPS_AUTOCOMPLETE_COUNTRY') ?: 'se';
+$quoteFormEndpoint = getenv('QUOTE_FORM_ENDPOINT') ?: 'https://admin.nyskickstenaltan.se/public-quote-request.php';
 
 if (in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $origin);
@@ -25,8 +29,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 }
 
 echo json_encode([
-    'googleAnalyticsMeasurementId' => 'G-9TKSWWGZF7',
-    'googleMapsApiKey' => 'AIzaSyDuJVe5lEDhE_5w2FOBvOvt4E30qKpVtqk',
-    'googleMapsAutocompleteCountry' => 'se',
-    'quoteFormEndpoint' => 'https://admin.nyskickstenaltan.se/public-quote-request.php',
+    'googleAnalyticsMeasurementId' => $googleAnalyticsMeasurementId,
+    'googleMapsApiKey' => $googleMapsApiKey,
+    'googleMapsAutocompleteCountry' => $googleMapsAutocompleteCountry,
+    'quoteFormEndpoint' => $quoteFormEndpoint,
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
