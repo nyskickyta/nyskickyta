@@ -29,17 +29,63 @@ const navToggle = document.querySelector(".nav-toggle");
 const siteNav = document.querySelector(".site-nav");
 const siteHeader = document.querySelector(".site-header");
 const quoteAnchorLinks = document.querySelectorAll('a[href="#offert-form"]');
-const siteConfig = window.NYSKICK_SITE_CONFIG || {};
+const siteConfig = {};
 const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(window.navigator.userAgent);
-const quoteFormEndpoint = String(siteConfig.quoteFormEndpoint || "").trim();
-const analyticsMeasurementId = "G-9TKSWWGZF7";
 const analyticsConsentKey = "nyskick_cookie_consent";
 const thankYouTrackedKey = "nyskick_generate_lead_tracked";
+const runtimeConfigUrl =
+  document.querySelector('meta[name="nyskick-runtime-config"]')?.getAttribute("content")
+  || window.NYSKICK_RUNTIME_CONFIG_URL
+  || "";
 const statusMessages = {
   validation: "Fyll i namn, telefon, valen i formuläret och adressuppgifterna innan du skickar formuläret.",
   review: "Din förfrågan kunde inte skickas direkt. Kontrollera uppgifterna och försök igen, eller ring oss så hjälper vi dig direkt.",
   error: "Något gick fel när formuläret skulle skickas. Försök igen om en liten stund eller ring oss direkt.",
 };
+
+function mergeSiteConfig(nextConfig) {
+  if (!nextConfig || typeof nextConfig !== "object") {
+    return;
+  }
+
+  Object.assign(siteConfig, nextConfig);
+}
+
+async function loadSiteConfig() {
+  mergeSiteConfig(window.NYSKICK_SITE_CONFIG);
+
+  if (!runtimeConfigUrl) {
+    return siteConfig;
+  }
+
+  try {
+    const response = await fetch(runtimeConfigUrl, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Runtime config request failed with status ${response.status}`);
+    }
+
+    const config = await response.json();
+    mergeSiteConfig(config);
+  } catch (error) {
+    console.error("Publik runtime-config kunde inte laddas.", error);
+  }
+
+  return siteConfig;
+}
+
+function getQuoteFormEndpoint() {
+  return String(siteConfig.quoteFormEndpoint || "").trim();
+}
+
+function getAnalyticsMeasurementId() {
+  return String(siteConfig.googleAnalyticsMeasurementId || "").trim();
+}
 
 function getAnalyticsConsent() {
   try {
@@ -88,6 +134,8 @@ function trackLeadIfNeeded() {
 }
 
 function loadAnalytics() {
+  const analyticsMeasurementId = getAnalyticsMeasurementId();
+
   if (!analyticsMeasurementId || document.querySelector('script[data-ga-loader="1"]')) {
     trackLeadIfNeeded();
     return;
@@ -525,7 +573,7 @@ if (offerForm) {
         formStatus.textContent = "";
       }
 
-      const targetUrl = quoteFormEndpoint || "/";
+      const targetUrl = getQuoteFormEndpoint() || "/";
       const payloadBody = encodeFormData(payload);
       const requestOptions = {
         method: "POST",
@@ -541,7 +589,7 @@ if (offerForm) {
             throw new Error(`Netlify form submit failed with status ${response.status}`);
           }
 
-          if (quoteFormEndpoint) {
+          if (getQuoteFormEndpoint()) {
             return response.json().catch(() => ({ ok: true }));
           }
 
@@ -599,5 +647,7 @@ quoteAnchorLinks.forEach((link) => {
   });
 });
 
-initAddressAutocomplete();
-initCookieConsent();
+loadSiteConfig().finally(() => {
+  initAddressAutocomplete();
+  initCookieConsent();
+});
