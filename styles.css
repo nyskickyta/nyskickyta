@@ -211,6 +211,69 @@ h3 {
   gap: 12px;
 }
 
+.center {
+  text-align: center;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.card.highlight,
+.card.featured {
+  border: 2px solid #2f6f4e;
+  background: #f4f9f6;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #2f6f4e;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #eee;
+  color: #333;
+}
+
 .hero-actions {
   margin-top: 24px;
 }
@@ -1017,6 +1080,10 @@ h3 {
   .header-inner {
     flex-wrap: wrap;
   }
+
+  .grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1051,6 +1118,11 @@ h3 {
   .why-grid,
   .reviews-grid,
   .cta-box {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-3,
+  .grid-4 {
     grid-template-columns: 1fr;
   }
 
