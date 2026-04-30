@@ -508,6 +508,27 @@ h3 {
   max-width: 82rem;
 }
 
+.trust-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
+  margin-top: 4px;
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  background: #fbfcfa;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.trust-row span {
+  display: inline-flex;
+  align-items: center;
+}
+
 .trust-item {
   display: flex;
   align-items: center;
@@ -1079,6 +1100,10 @@ h3 {
     grid-column: auto;
   }
 
+  .trust-row {
+    justify-content: flex-start;
+  }
+
   .cta-box {
     display: grid;
   }
@@ -1130,6 +1155,12 @@ h3 {
   .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  .trust-row {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px;
   }
 
   .package-card-featured {
