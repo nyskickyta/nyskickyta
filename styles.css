@@ -722,6 +722,10 @@ h3 {
   padding: 34px 28px;
 }
 
+.package-card-featured .package-head {
+  padding-top: 24px;
+}
+
 .package-badge {
   position: absolute;
   top: 18px;
@@ -737,6 +741,7 @@ h3 {
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.03em;
+  z-index: 1;
 }
 
 .package-kicker {
@@ -1125,6 +1130,15 @@ h3 {
   .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  .package-card-featured {
+    transform: none;
+    padding: 32px 24px;
+  }
+
+  .package-card-featured .package-head {
+    padding-top: 28px;
   }
 
   .header-call,
